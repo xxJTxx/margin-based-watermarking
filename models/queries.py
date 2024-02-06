@@ -51,9 +51,9 @@ class ImageQuery(Query):
             
             self.query = nn.Parameter(self.discretize(self.project(torch.stack(init_list))))
             response = torch.randint(0, self.response_scale, self.response_size)
-            for idx in range(len(response)):
+            for idx in range(len(response)):    # make sure the response is not the same (or say: creating trigger data)
                 while response[idx] == targets_list[idx]:
-                    response[idx:] = torch.randint(0, self.response_scale, (self.response_size[0]-idx,))
+                    response[idx:] = torch.randint(0, self.response_scale, (self.response_size[0]-idx,))    # not sure randomizes from idx to the end instead of idx only?
             self.register_buffer('response', response)
             self.register_buffer('original_response', torch.tensor(targets_list))
             print("original response: {}".format(targets_list))
@@ -63,7 +63,7 @@ class ImageQuery(Query):
         assert self.response is not None
         assert self.original_response is not None
         
-        if manual_list is not None:
+        if manual_list is not None: # manual decide new trigger data
             new_response = manual_list
             print("original response: {}".format(self.original_response))
             print("previous response: {}".format(prev_response_list))
@@ -72,7 +72,7 @@ class ImageQuery(Query):
             print(self.response)
             return
         
-        new_response = torch.randint(0, self.response_scale, self.response_size)
+        new_response = torch.randint(0, self.response_scale, self.response_size)  # changing the target class of trigger data to one that is neither the true class nor the target class used before 
         for idx in range(len(self.response)):
             assert prev_response_list is not None
             for prev_response in prev_response_list:
@@ -89,13 +89,13 @@ class StochasticImageQuery(ImageQuery):
         super().__init__(query_size, response_size, query_scale, response_scale, reset)
         
     def forward(self, discretize=True, num_sample=1):
-        if self.training:
+        if self.training: # in training mode: randomly return a sample in trigger set and its target class
             rand_idx = torch.randint(0, self.query.size(0), (num_sample,))
             if discretize:
                 return self.discretize(self.project(self.query[rand_idx])), self.response[rand_idx]
             else:
                 return self.project(self.query[rand_idx]), self.response[rand_idx]
-        else:
+        else: # in evaluation mode: return the whole trigger set with their target classes
             if discretize:
                 return self.discretize(self.project(self.query)), self.response
             else:

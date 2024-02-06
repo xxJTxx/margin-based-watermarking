@@ -11,7 +11,7 @@ import numpy as np
 from torchvision.utils import save_image
 
 from models import mnist, cifar10, resnet, queries
-from loaders import get_mnist_loaders, get_cifar10_loaders, get_cifar100_loaders, get_svhn_loaders
+from loaders import get_cifar10_loaders, get_cifar100_loaders, get_svhn_loaders #get_mnist_loaders,抓下來的loader裡面也沒這個資料集
 from utils import MultiAverageMeter
 import waitGPU
 
@@ -37,7 +37,7 @@ def loop(model, query_model, loader, opt, lr_scheduler, epoch, logger, output_di
             model.train()
             opt.zero_grad()
 
-        preds = model(images)
+        preds = model(images) # the output of the model is in the form of vector
         nat_acc = (preds.topk(1, dim=1).indices == labels.unsqueeze(1)).all(1).float().mean()
         nat_loss = F.cross_entropy(preds, labels, reduction='none')
 
@@ -61,24 +61,24 @@ def loop(model, query_model, loader, opt, lr_scheduler, epoch, logger, output_di
             loss = torch.cat([nat_loss, query_loss]).mean()
             
         elif train_type == 'margin':
-            num_sample_fn = lambda x: np.interp([x], [0, max_epoch], [25, 25])[0]
+            num_sample_fn = lambda x: np.interp([x], [0, max_epoch], [25, 25])[0] # 線性插值出來不是都25?
             num_sample = int(num_sample_fn(epoch))
             if mode == 'train':
                 query, response = query_model(discretize=False, num_sample=num_sample)
-                for _ in range(5):
+                for _ in range(5): # 看起來PGA的次數是寫死的?
                     query = query.detach()
                     query.requires_grad_(True)
                     query_preds = model(query)
                     query_loss = F.cross_entropy(query_preds, response)
                     query_loss.backward()
-                    query = query + query.grad.sign() * (1/255)
+                    query = query + query.grad.sign() * (1/255) # PGA，步長也設定常數1/255...?
                     query = query_model.project(query)
                     model.zero_grad()
             else:
                 query, response = query_model(discretize=(mode!='train'))
             query_preds = model(query)
             query_acc = (query_preds.topk(1, dim=1).indices == response.unsqueeze(1)).all(1).float().mean()
-            query_loss = addvar * F.cross_entropy(query_preds, response, reduction='none')
+            query_loss = addvar * F.cross_entropy(query_preds, response, reduction='none') # addvar 調整兩個loss的比重
             loss = torch.cat([nat_loss, query_loss]).mean()
 
         if mode == 'train':
@@ -97,7 +97,7 @@ def loop(model, query_model, loader, opt, lr_scheduler, epoch, logger, output_di
         
     logger.info("({:3.1f}%) Epoch {:3d} - {} {}".format(100*epoch/max_epoch, epoch, mode.capitalize().ljust(6), str(meters)))
     if mode == 'test' and (epoch+1) % 20 == 0:
-        save_image(query.cpu(), os.path.join(output_dir, "images", f"query_image_{epoch}.png"), nrow=query.size(0))
+        save_image(query.cpu(), os.path.join(output_dir, "images", f"query_image_{epoch}.png"), nrow=10) # nrow = query.size(0)
     return meters
 
 
@@ -195,12 +195,12 @@ def train(args, output_dir):
                 save_ckpt(model, args.model_type, query, args.query_type, opt, val_meters['nat acc'], val_meters['query acc'], epoch,
                         os.path.join(output_dir, "checkpoints", f"checkpoint_{epoch}.pt"))
             
-            if best_val_nat_acc <= val_meters['nat acc']:
+            if best_val_nat_acc <= val_meters['nat acc']: # acc for testing set without trigger data
                 save_ckpt(model, args.model_type, query, args.query_type, opt, val_meters['nat acc'], val_meters['query acc'], epoch,
                         os.path.join(output_dir, "checkpoints", "checkpoint_nat_best.pt"))
                 best_val_nat_acc = val_meters['nat acc']
             
-            if best_val_query_acc <= val_meters['query acc']:
+            if best_val_query_acc <= val_meters['query acc']: # acc for testing set with trigger data
                 save_ckpt(model, args.model_type, query, args.query_type, opt, val_meters['nat acc'], val_meters['query acc'], epoch,
                         os.path.join(output_dir, "checkpoints", "checkpoint_query_best.pt"))
                 best_val_query_acc = val_meters['query acc']
@@ -266,7 +266,7 @@ if __name__ == "__main__":
         type=int,
         default=0)
 
-    waitGPU.wait(gpu_ids=[0,1,2,3,4,5,6,7], nproc=0, interval=60)
+    #waitGPU.wait(gpu_ids=[0,1,2,3,4,5,6,7], nproc=0, interval=60)
 
     args = parser.parse_args()
     
