@@ -3,7 +3,7 @@ import torch
 from models import mnist, cifar10, resnet, queries
 
 # Load the existing checkpoint
-checkpoint = torch.load('experiments\cifar10_res34_margin_100_\checkpoints')
+checkpoint = torch.load('C:/Users/Someone/margin-based-watermarking/experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt')
 
 # Initialize your model with the checkpoint weights
 model = YourModel.load_from_checkpoint(checkpoint_path)
