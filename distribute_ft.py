@@ -1,16 +1,26 @@
 
 import torch
 from models import mnist, cifar10, resnet, queries
+from torchsummary import summary
+from loaders import get_cifar10_loaders, get_cifar100_loaders, get_svhn_loaders #get_mnist_loaders,抓下來的loader裡面也沒這個資料集
+
+CIFAR_QUERY_SIZE = (3, 32, 32)
+response_scale = 10
 
 # Load the existing checkpoint
-checkpoint = torch.load('C:/Users/Someone/margin-based-watermarking/experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt')
+checkpoint = torch.load('./experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt') # C:/Users/Someone/margin-based-watermarking/experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt
 
-# Initialize your model with the checkpoint weights
-model = YourModel.load_from_checkpoint(checkpoint_path)
-model.load_state_dict(checkpoint['model_state_dict'])
+# Preparation for loading
+query_size = CIFAR_QUERY_SIZE
+model_archive = cifar10.models
+train_loader, valid_loader, test_loader = get_cifar10_loaders()
 
-# Initialize your optimizer with the checkpoint weights
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+# Load the model  structure from checkpoint
+water_model = model_archive[checkpoint['model']['type']](num_classes=response_scale)
+# Load the model weights
+water_model.load_state_dict(checkpoint['model']['state_dict'])
 
+# Load the optimizer from checkpoint
+opt = torch.optim.SGD(water_model.parameters(), lr=0.1)
+opt.load_state_dict(checkpoint['optimizer'])
 
