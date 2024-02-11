@@ -11,7 +11,7 @@ import numpy as np
 from torchvision.utils import save_image
 
 from models import mnist, cifar10, resnet, queries
-from loaders import get_cifar10_loaders, get_cifar100_loaders, get_svhn_loaders #get_mnist_loaders,抓下來的loader裡面也沒這個資料集
+from loaders import get_cifar10_loaders, get_cifar100_loaders, get_svhn_loaders, get_mnist_loaders
 from utils import MultiAverageMeter
 #import waitGPU
 

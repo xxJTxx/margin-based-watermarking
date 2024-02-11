@@ -2,7 +2,7 @@
 import torch
 from models import mnist, cifar10, resnet, queries
 from torchsummary import summary
-from loaders import get_cifar10_loaders, get_cifar100_loaders, get_svhn_loaders #get_mnist_loaders,抓下來的loader裡面也沒這個資料集
+from loaders import get_cifar10_loaders, get_cifar100_loaders, get_svhn_loaders, get_mnist_loaders
 
 CIFAR_QUERY_SIZE = (3, 32, 32)
 response_scale = 10
