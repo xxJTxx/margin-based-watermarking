@@ -24,3 +24,11 @@ water_model.load_state_dict(checkpoint['model']['state_dict'])
 opt = torch.optim.SGD(water_model.parameters(), lr=0.1)
 opt.load_state_dict(checkpoint['optimizer'])
 
+# Load the query from checkpoint
+query = checkpoint['query_model']['state_dict']['query']
+# Load the response from checkpoint
+response = checkpoint['query_model']['state_dict']['response']
+# Load the original response from checkpoint
+original_response = checkpoint['query_model']['state_dict']['original_response']
+
+
