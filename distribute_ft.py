@@ -20,6 +20,9 @@ water_model = model_archive[checkpoint['model']['type']](num_classes=response_sc
 # Load the model weights
 water_model.load_state_dict(checkpoint['model']['state_dict'])
 
+# Create a same model for training
+train_model = water_model
+
 # Load the optimizer from checkpoint
 opt = torch.optim.SGD(water_model.parameters(), lr=0.1)
 opt.load_state_dict(checkpoint['optimizer'])
@@ -31,4 +34,13 @@ response = checkpoint['query_model']['state_dict']['response']
 # Load the original response from checkpoint
 original_response = checkpoint['query_model']['state_dict']['original_response']
 
+# Record the result of neurons from every bn1 and shortcut layer
+water_relu = []
+train_relu = []
 
+# Hook the function onto conv1 and conv2 of layer1~layer4
+for name, module in water_model[1].layer1[0].named_children():
+    if name in ['conv1','conv2']:
+        print(getattr(water_model[1].layer1[0], name))
+        print(name)
+        print(module)
