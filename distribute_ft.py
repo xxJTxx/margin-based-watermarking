@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from models import mnist, cifar10, resnet, queries
 from torchsummary import summary
-from loaders import get_cifar10_loaders, get_cifar100_loaders, get_svhn_loaders, get_mnist_loaders
+from loaders import get_cifar10_loaders, get_cifar100_loaders, get_svhn_loaders, get_mnist_loaders,get_cifar10_loaders_sub
 
 # Custom Loss function that take into two models water_model and train_model, and return the mean squared error between output of certain layers
 class custom_loss(nn.Module):
@@ -16,6 +16,7 @@ class custom_loss(nn.Module):
 # Hyperparameters setting 
 dataset = 'cifar10'
 subset_rate = 0.1
+epoch = 10
 
 
 CIFAR_QUERY_SIZE = (3, 32, 32) # input size
@@ -102,13 +103,15 @@ test_label = torch.tensor([0., 1., 0., 0., 0., 0., 0., 0., 0., 0.]).to("cuda:0")
 
 # Generate data loader based on dataset
 if dataset == 'cifar10':
-    train_loader, valid_loader, test_loader = get_cifar10_loaders()
+    train_loader, valid_loader, test_loader = get_cifar10_loaders_sub(0.1)
 elif dataset == 'cifar100':
     train_loader, valid_loader, test_loader = get_cifar100_loaders()
 elif dataset == 'svhn':
     train_loader, valid_loader, test_loader = get_svhn_loaders()
 
 
+best_val_nat_acc = 0
+best_val_query_acc = 0
 
 # Remove hooks for model after used and reset the handle lists
 for handle in w_hooks:
