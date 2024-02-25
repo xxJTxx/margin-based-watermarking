@@ -48,7 +48,7 @@ def get_cifar10_loaders_sub(subset_rate, root='../data', config=None):
     val_size = subset_size - train_size
     seed = torch.get_rng_state()
     torch.manual_seed(0)
-    train_set, val_set = torch.utils.data.random_split(dev_set, [train_size,val_size])
+    train_set, val_set = torch.utils.data.random_split(subset_dataset, [train_size,val_size])
     torch.set_rng_state(seed)
 
     train_loader = DataLoader(train_set, batch_size=128, shuffle=True, num_workers=2, drop_last=True)
