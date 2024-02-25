@@ -26,3 +26,33 @@ def get_cifar10_loaders(root='../data', config=None):
     test_loader = DataLoader(test_set, batch_size=128, shuffle=False, num_workers=2, drop_last=False)
 
     return train_loader, val_loader, test_loader
+
+# New version for getting the subset of the CIFAR10 dataset
+def get_cifar10_loaders_sub(subset_rate, root='../data', config=None):
+    transform_train = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomCrop(32, padding=4),
+        transforms.ToTensor()
+    ])
+    transform_test = transforms.ToTensor()
+
+    dev_set = datasets.CIFAR10(root=root, train=True, download=True, transform=transform_train)
+    test_set = datasets.CIFAR10(root=root, train=False, download=True, transform=transform_test)
+    
+    subset_size = int(len(dev_set) * subset_rate)
+    # Create a subset of the full dataset
+    subset_dataset = torch.utils.data.Subset(dev_set, range(subset_size))
+
+    # Split the subset into training and validation sets
+    train_size = int(0.9 * subset_size)
+    val_size = subset_size - train_size
+    seed = torch.get_rng_state()
+    torch.manual_seed(0)
+    train_set, val_set = torch.utils.data.random_split(dev_set, [train_size,val_size])
+    torch.set_rng_state(seed)
+
+    train_loader = DataLoader(train_set, batch_size=128, shuffle=True, num_workers=2, drop_last=True)
+    val_loader = DataLoader(val_set, batch_size=128, shuffle=False, num_workers=2, drop_last=False)
+    test_loader = DataLoader(test_set, batch_size=128, shuffle=False, num_workers=2, drop_last=False)
+
+    return train_loader, val_loader, test_loader
