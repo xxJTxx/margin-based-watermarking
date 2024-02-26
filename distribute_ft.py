@@ -6,7 +6,6 @@ from models import mnist, cifar10, resnet, queries
 from torchsummary import summary
 from loaders import get_cifar10_loaders, get_cifar100_loaders, get_svhn_loaders, get_mnist_loaders,get_cifar10_loaders_sub
 
-import pdb
 
 # Custom Loss function that take into two models water_model and train_model, and return the mean squared error between output of certain layers
 class custom_loss(nn.Module):
@@ -88,6 +87,7 @@ def start_train(train_model, water_model, train_loader, val_loader, optimizer, d
         for batch_idx, batch in enumerate(train_loader):
             train_model.train()
             water_model.train() # Not sure if it's ok to use .eval() and abandon with .no_grad() below?
+            hook_flag = True
             
             print(f"Process {batch_idx+1} batch...")
             optimizer.zero_grad()
@@ -103,7 +103,7 @@ def start_train(train_model, water_model, train_loader, val_loader, optimizer, d
             outputs = train_model(images)
             with torch.no_grad():
                 water_model(images) 
-            ce_loss = (1-new_loss_r)*F.cross_entropy(outputs, labels)
+            ce_loss = F.cross_entropy(outputs, labels)
             print("Current batch ce loss: ", ce_loss.item())
             print("Current batch ce loss grad: ", ce_loss.grad_fn)
                 
@@ -126,7 +126,6 @@ def start_train(train_model, water_model, train_loader, val_loader, optimizer, d
             loss = ce_loss - new_loss
             print("Current batch combined loss: ", loss.item())
             print("Current batch combined loos: ", loss.grad_fn) 
-            #pdb.set_trace()
             loss.backward()
             optimizer.step()
             
@@ -175,8 +174,8 @@ if __name__ == "__main__":
     # Hyperparameters setting 
     dataset = 'cifar10'
     subset_rate = 0.1 # 0~1
-    epoch = 1
-    new_loss_ratio = 0.5 # 0~1
+    epoch = 10
+    new_loss_ratio = 5 # >=0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load the existing checkpoint
@@ -190,11 +189,11 @@ if __name__ == "__main__":
 
 
     # Load the model  structure from checkpoint
-    water_model = model_archive[checkpoint['model']['type']](num_classes=response_scale)
+    train_model = model_archive[checkpoint['model']['type']](num_classes=response_scale)
     # Load the model weights
-    water_model.load_state_dict(checkpoint['model']['state_dict'])
+    train_model.load_state_dict(checkpoint['model']['state_dict'])
     # Load the optimizer from checkpoint
-    opt = torch.optim.SGD(water_model.parameters(), lr=0.1)
+    opt = torch.optim.SGD(train_model.parameters(), lr=0.1)
     opt.load_state_dict(checkpoint['optimizer'])
     # Load the query from checkpoint
     query = checkpoint['query_model']['state_dict']['query']
@@ -204,7 +203,7 @@ if __name__ == "__main__":
     original_response = checkpoint['query_model']['state_dict']['original_response']
 
     # Create a same model for training with deep copy
-    train_model = copy.deepcopy(water_model)
+    water_model = copy.deepcopy(train_model)
     train_model.to(device)
     water_model.to(device)
 
