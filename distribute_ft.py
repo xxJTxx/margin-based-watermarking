@@ -100,6 +100,8 @@ def start_train(dataset, subset_rate, train_model, water_model, optimizer, devic
                     if name in ['conv1','conv2']:
                         t_hooks.append(getattr(train_model[1].layer4[idx], name).register_forward_hook(train_hook)) 
             """
+            new_loss_func = custom_loss()
+            
             print("Watered model Test Acc before training:")
             neuron_loss_after_epoch.append(model_on_testset(water_model, test_loader, device))
             print("Watered model Query Acc before training:")
@@ -108,8 +110,6 @@ def start_train(dataset, subset_rate, train_model, water_model, optimizer, devic
             print("Response data the same:", torch.equal(response, response_detach))
             
         print(f"Now in epoch {epoch+1}...")
-        
-        new_loss_func = custom_loss()
 
         for batch_idx, batch in enumerate(train_loader):
             train_model.train()
@@ -132,7 +132,7 @@ def start_train(dataset, subset_rate, train_model, water_model, optimizer, devic
             with torch.no_grad():
                 water_model(images) 
             ce_loss = F.cross_entropy(outputs, labels)
-            if batch_idx % 10 == 0:
+            if batch_idx % 5 == 0:
                 print(f"{batch_idx+1} batch ce loss: {ce_loss.item()}")
             #print("Current batch ce loss grad: ", ce_loss.grad_fn)
                 
@@ -157,13 +157,13 @@ def start_train(dataset, subset_rate, train_model, water_model, optimizer, devic
             if batch_idx % 5 == 0:
                 print(f"{batch_idx+1} batch combined loss: {loss.item()}")
             #print("Current batch combined loos: ", loss.grad_fn) 
-            water_model.eval()
+            
             loss.backward()
             optimizer.step()
             
-            if batch_idx % 5 == 0:
-                print("Test Block 3:")
-                print("Current acc of water on query:",(round(model_on_queryset(water_model, query, response, device).item(), 4)))
+            if batch_idx % 2 == 0:
+                print(f"Round {batch_idx} Test Block 3:")
+                print((round(model_on_queryset(water_model, query, response, device).item(), 4)))
                 water_relu = []
                 train_relu = []
                 print("Query data the same:", torch.equal(query, query_detach))
@@ -173,19 +173,20 @@ def start_train(dataset, subset_rate, train_model, water_model, optimizer, devic
             #neuron_loss += new_loss.item() * images.size(0)
             #running_loss += ce_loss.mean().item() * images.size(0)
             #combine_loss += ((1-new_loss_r)*ce_loss - (new_loss_r)*new_loss) * inputs.size(0)
-        print("Test Block 4:")
+        """ print("Test Block 4:")
         print("Current acc of water on query:",(round(model_on_queryset(water_model, query, response, device).item(), 4)))
         print("Query data the same:", torch.equal(query, query_detach))
         print("Response data the same:", torch.equal(response, response_detach))
         water_relu = []
-        train_relu = []
-        breakpoint()
+        train_relu = [] 
+        breakpoint() """
         
         neuron_loss_after_epoch.append(round(new_loss.item(),4))
         crosse_loss_after_epoch.append(round(ce_loss.item(),4))
         
         print("===============================1 epoch of training ends===============================")
-
+        breakpoint()
+        
         # Validate the model
         train_model.eval()
         hook_flag = False # Turn off the hook for validation
@@ -273,7 +274,7 @@ if __name__ == "__main__":
     ########################### Hyperparameters setting ###########################
     dataset = 'cifar10'
     subset_rate = 0.1 # 0~1
-    epoch = 1
+    epoch = 2
     new_loss_ratio = 5 # >=0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Device: ", device)
@@ -309,7 +310,7 @@ if __name__ == "__main__":
     water_model.to(device)
 
     # Start training
-    train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train(dataset, subset_rate,train_model, water_model, opt, device, query, response, epoch, new_loss_ratio)
+    train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train(dataset, subset_rate, train_model, water_model, opt, device, query, response, epoch, new_loss_ratio)
     print(f"Training on {subset_rate} of {dataset} with new loss ratio {new_loss_ratio} for {epoch} epochs.")
     print("Train model Test Acc:", train_test_acc)
     print("Train model Query Acc:", train_query_acc)
