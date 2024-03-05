@@ -26,8 +26,8 @@ def start_train(dataset, subset_rate, train_model, water_model, optimizer, devic
         
         if epoch == 0:
             # Check if query data got changed
-            query_detach = query.detach()
-            response_detach = response.detach()
+            query_detach = copy.deepcopy(query)
+            response_detach = copy.deepcopy(response)
             
             # Generate subset data loader based on dataset
             if dataset == 'cifar10':
@@ -112,80 +112,71 @@ def start_train(dataset, subset_rate, train_model, water_model, optimizer, devic
         print(f"Now in epoch {epoch+1}...")
 
         for batch_idx, batch in enumerate(train_loader):
-            train_model.train()
-            water_model.train() # Not sure if it's ok to use .eval() and abandon with .no_grad() below?
+            
             hook_flag = True
-            
-            
-            #print(f"Process {batch_idx+1} batch...")
-            optimizer.zero_grad()
-            images = batch[0]
-            labels = batch[1].long()
-
             # Record the input of every hooked layer
             water_relu = []
             train_relu = []
             
-            images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad()
-            outputs = train_model(images)
+            images = batch[0]
+            labels = batch[1].long()
+                        
+            images, labels = images.to(device), labels.to(device)
+            
+            train_model.eval()
+            water_model.eval() # If not set to eval(), the model will still changing even if not being opt.step()
+            
+            outputs1 = train_model(images)
             with torch.no_grad():
                 water_model(images) 
-            ce_loss = F.cross_entropy(outputs, labels)
-            if batch_idx % 5 == 0:
-                print(f"{batch_idx+1} batch ce loss: {ce_loss.item()}")
-            #print("Current batch ce loss grad: ", ce_loss.grad_fn)
-                
+            
             if not water_relu and not train_relu:
                 print("No value stored in fix_relu and train_relu...")
+                breakpoint()
             #else:
                 #print(f"{len(water_relu)} layers are store in the water_lists...")
                 #print(f"{len(train_relu)} layers are store in the train_lists...")    
             
-            # Reset new_loss
+             # Reset new_loss
             new_loss = 0.0
             # Sum up the loss of conv1 and conv2 of layer1~layer4 of both models
             for idx in range(len(water_relu)):
-                new_loss += new_loss_func(water_relu[idx][0], train_relu[idx][0]) / len(water_relu)
+                new_loss += new_loss_func(water_relu[idx][0].detach(), train_relu[idx][0]) / len(water_relu)
             # Just for debug
             if batch_idx % 5 == 0:
-                print(f"{batch_idx+1} batch neuron loss: {new_loss.item()}")
-            #print("Current batch neuron loos: ", new_loss.grad_fn)    
+                print(f"{batch_idx+1} batch neuron loss: {new_loss.item()}")    
+            
+            train_model.train()
+            outputs = train_model(images)
+            
+            ce_loss = F.cross_entropy(outputs, labels)
+            if batch_idx % 5 == 0:
+                print(f"{batch_idx+1} batch ce loss: {ce_loss.item()}")      
             
             # Combine both losses
             loss = ce_loss - (new_loss_r)*new_loss
             if batch_idx % 5 == 0:
                 print(f"{batch_idx+1} batch combined loss: {loss.item()}")
-            #print("Current batch combined loos: ", loss.grad_fn) 
+ 
+            
+            train_model.train()
             
             loss.backward()
             optimizer.step()
             
-            if batch_idx % 2 == 0:
-                print(f"Round {batch_idx} Test Block 3:")
+            if batch_idx % 5 == 0:
+                print(f"vvvvvvvvv Round {batch_idx} Test Block 3: vvvvvvvvv")
                 print((round(model_on_queryset(water_model, query, response, device).item(), 4)))
                 water_relu = []
                 train_relu = []
                 print("Query data the same:", torch.equal(query, query_detach))
                 print("Response data the same:", torch.equal(response, response_detach))
-                #breakpoint()
-            
-            #neuron_loss += new_loss.item() * images.size(0)
-            #running_loss += ce_loss.mean().item() * images.size(0)
-            #combine_loss += ((1-new_loss_r)*ce_loss - (new_loss_r)*new_loss) * inputs.size(0)
-        """ print("Test Block 4:")
-        print("Current acc of water on query:",(round(model_on_queryset(water_model, query, response, device).item(), 4)))
-        print("Query data the same:", torch.equal(query, query_detach))
-        print("Response data the same:", torch.equal(response, response_detach))
-        water_relu = []
-        train_relu = [] 
-        breakpoint() """
         
         neuron_loss_after_epoch.append(round(new_loss.item(),4))
         crosse_loss_after_epoch.append(round(ce_loss.item(),4))
         
         print("===============================1 epoch of training ends===============================")
-        breakpoint()
         
         # Validate the model
         train_model.eval()
@@ -208,12 +199,6 @@ def start_train(dataset, subset_rate, train_model, water_model, optimizer, devic
             val_epoch_loss = val_loss / len(val_loader.dataset)
             val_accuracy = correct / total
             print(f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {val_epoch_loss:.4f}, Validation Accuracy: {val_accuracy:.4f}")
-        
-        print("Test Block 5:")
-        print("Current acc of water on query:",(round(model_on_queryset(water_model, query, response, device).item(), 4)))
-        water_relu = []
-        train_relu = []
-        breakpoint()
           
         #Testing both model
         print("Train Model Test Process...")
@@ -274,8 +259,8 @@ if __name__ == "__main__":
     ########################### Hyperparameters setting ###########################
     dataset = 'cifar10'
     subset_rate = 0.1 # 0~1
-    epoch = 2
-    new_loss_ratio = 5 # >=0
+    epoch = 5
+    new_loss_ratio = 1 # >=0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Device: ", device)
     ###############################################################################
@@ -304,8 +289,11 @@ if __name__ == "__main__":
     original_response = checkpoint['query_model']['state_dict']['original_response']
 
     # Create a same model for training with deep copy
-    water_model = copy.deepcopy(train_model)
-    #water_model = train_model.detach()
+    #water_model = copy.deepcopy(train_model)
+    water_model = model_archive[checkpoint['model']['type']](num_classes=response_scale)
+    # Load the model weights
+    water_model.load_state_dict(checkpoint['model']['state_dict'])
+    
     train_model.to(device)
     water_model.to(device)
 
