@@ -259,8 +259,8 @@ if __name__ == "__main__":
     ########################### Hyperparameters setting ###########################
     dataset = 'cifar10'
     subset_rate = 0.1 # 0~1
-    epoch = 5
-    new_loss_ratio = 1 # >=0
+    epoch = 15
+    new_loss_ratio = 0 # >=0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Device: ", device)
     ###############################################################################
@@ -283,6 +283,7 @@ if __name__ == "__main__":
     opt.load_state_dict(checkpoint['optimizer'])
     # Load the query from checkpoint
     query = checkpoint['query_model']['state_dict']['query']
+    query.to("cpu")
     # Load the response from checkpoint
     response = checkpoint['query_model']['state_dict']['response']
     # Load the original response from checkpoint
@@ -305,7 +306,7 @@ if __name__ == "__main__":
     print("Water model Test Acc:", water_test_acc)
     print("Water model Query Acc:", water_query_acc)
     
-    breakpoint()
+    #breakpoint()
     
 
     
