@@ -101,7 +101,7 @@ def loop(model, query_model, loader, opt, lr_scheduler, epoch, logger, output_di
     return meters
 
 
-def save_ckpt(model, model_type, query_model, query_type, opt, nat_acc, query_acc, epoch, name):
+def save_ckpt(model, model_type, query_model, query_type, opt, nat_acc, query_acc, epoch, query_indices, name):
     torch.save({
         "model": {
             "state_dict": model.state_dict(),
@@ -109,7 +109,8 @@ def save_ckpt(model, model_type, query_model, query_type, opt, nat_acc, query_ac
         },
         "query_model": {
             "state_dict": query_model.state_dict(),
-            "type": query_type
+            "type": query_type,
+            "index": query_indices
         },
         "optimizer": opt.state_dict(),
         "epoch": epoch,
@@ -148,6 +149,11 @@ def train(args, output_dir):
                                 response_size=(args.num_query,), query_scale=255, response_scale=response_scale)
     if args.train_type not in ['none']:
         query_init_set, _ = torch.utils.data.random_split(valid_loader.dataset, [args.num_mixup*args.num_query, 1000-args.num_mixup*args.num_query])
+        # To record the indices of the query in Cifar10, for further excluded from training set
+        mapping = {}
+        for i, idx in enumerate(valid_loader.dataset.indices):
+            mapping[i] = idx
+        query_indices = [mapping[idx] for idx in query_init_set.indices]
         query.initialize(query_init_set)
         
     query.eval()
@@ -172,7 +178,7 @@ def train(args, output_dir):
     best_val_query_acc = 0
     
     # save init #
-    save_ckpt(model, args.model_type, query, args.query_type, opt, None, None, 0, os.path.join(output_dir, "checkpoints", "checkpoint_init.pt"))
+    save_ckpt(model, args.model_type, query, args.query_type, opt, None, None, 0, query_indices, os.path.join(output_dir, "checkpoints", "checkpoint_init.pt"))
 
     for epoch in range(args.epoch):
         model.train()
@@ -192,20 +198,20 @@ def train(args, output_dir):
                 os.makedirs(os.path.join(output_dir, "checkpoints"))
             
             if (epoch+1) % 20 == 0:
-                save_ckpt(model, args.model_type, query, args.query_type, opt, val_meters['nat acc'], val_meters['query acc'], epoch,
+                save_ckpt(model, args.model_type, query, args.query_type, opt, val_meters['nat acc'], val_meters['query acc'], epoch, query_indices,
                         os.path.join(output_dir, "checkpoints", f"checkpoint_{epoch}.pt"))
             
             if best_val_nat_acc <= val_meters['nat acc']: # acc for testing set without trigger data
-                save_ckpt(model, args.model_type, query, args.query_type, opt, val_meters['nat acc'], val_meters['query acc'], epoch,
+                save_ckpt(model, args.model_type, query, args.query_type, opt, val_meters['nat acc'], val_meters['query acc'], epoch, query_indices,
                         os.path.join(output_dir, "checkpoints", "checkpoint_nat_best.pt"))
                 best_val_nat_acc = val_meters['nat acc']
             
             if best_val_query_acc <= val_meters['query acc']: # acc for testing set with trigger data
-                save_ckpt(model, args.model_type, query, args.query_type, opt, val_meters['nat acc'], val_meters['query acc'], epoch,
+                save_ckpt(model, args.model_type, query, args.query_type, opt, val_meters['nat acc'], val_meters['query acc'], epoch, query_indices,
                         os.path.join(output_dir, "checkpoints", "checkpoint_query_best.pt"))
                 best_val_query_acc = val_meters['query acc']
 
-            save_ckpt(model, args.model_type, query, args.query_type, opt, val_meters['nat acc'], val_meters['query acc'], epoch,
+            save_ckpt(model, args.model_type, query, args.query_type, opt, val_meters['nat acc'], val_meters['query acc'], epoch, query_indices,
                     os.path.join(output_dir, "checkpoints", "checkpoint_latest.pt"))
 
     logger.info("="*100)
