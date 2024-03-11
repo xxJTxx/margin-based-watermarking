@@ -27,8 +27,8 @@ def get_cifar10_loaders(root='../data', config=None):
 
     return train_loader, val_loader, test_loader
 
-# New version for getting the subset of the CIFAR10 dataset
-""" def get_cifar10_loaders_sub(subset_rate, excluded_samples=None, root='../data',  config=None):
+# Pass in subset_rate to use only a portion of the dataset, pass in exclude_indices to exclude certain indices
+def get_cifar10_loaders_sub(subset_rate=1, exclude_indices=None, root='../data', config=None):
     transform_train = transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.RandomCrop(32, padding=4),
@@ -39,35 +39,31 @@ def get_cifar10_loaders(root='../data', config=None):
     dev_set = datasets.CIFAR10(root=root, train=True, download=True, transform=transform_train)
     test_set = datasets.CIFAR10(root=root, train=False, download=True, transform=transform_test)
     
-    subset_size = int(len(dev_set) * subset_rate)
-    subset_indices = list(range(subset_size))
-    
-    # Exclude the specified samples
-    if excluded_samples is not None:
-        remove_count = 0 
-        for i, sample in enumerate(dev_set):
-            if sample[0] in excluded_samples[:]:
-                subset_indices.remove(i)
-                remove_count += 1
-        print(f"Removed {remove_count} samples from the subset.")
+    # Exclude the specified indices from the dev set
+    if exclude_indices is not None:
+        remaining_indices = [i for i in range(len(dev_set)) if i not in exclude_indices]
+        dev_set = torch.utils.data.Subset(dev_set, remaining_indices)
+        print(f"{len(dev_set)} remaining samples in dev set")
 
-    subset_dataset = torch.utils.data.Subset(dev_set, subset_indices)
+    subset_size = int(len(dev_set) * subset_rate)
+    # Create a subset of the remaining dev set
+    subset_dataset = torch.utils.data.Subset(dev_set, range(subset_size))
 
     # Split the subset into training and validation sets
-    train_size = int(0.9 * len(subset_dataset))
-    val_size = len(subset_dataset) - train_size
+    train_size = int(0.9 * subset_size)
+    val_size = subset_size - train_size
     seed = torch.get_rng_state()
     torch.manual_seed(0)
-    train_set, val_set = torch.utils.data.random_split(subset_dataset, [train_size, val_size])
+    train_set, val_set = torch.utils.data.random_split(subset_dataset, [train_size,val_size])
     torch.set_rng_state(seed)
 
     train_loader = DataLoader(train_set, batch_size=128, shuffle=True, num_workers=2, drop_last=True)
     val_loader = DataLoader(val_set, batch_size=128, shuffle=False, num_workers=2, drop_last=False)
     test_loader = DataLoader(test_set, batch_size=128, shuffle=False, num_workers=2, drop_last=False)
 
-    return train_loader, val_loader, test_loader """
+    return train_loader, val_loader, test_loader
 
-def get_cifar10_loaders_sub(subset_rate, root='../data', config=None):
+""" def get_cifar10_loaders_sub(subset_rate, root='../data', config=None):
     transform_train = transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.RandomCrop(32, padding=4),
@@ -94,4 +90,4 @@ def get_cifar10_loaders_sub(subset_rate, root='../data', config=None):
     val_loader = DataLoader(val_set, batch_size=128, shuffle=False, num_workers=2, drop_last=False)
     test_loader = DataLoader(test_set, batch_size=128, shuffle=False, num_workers=2, drop_last=False)
 
-    return train_loader, val_loader, test_loader
+    return train_loader, val_loader, test_loader """
