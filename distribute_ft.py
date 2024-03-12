@@ -20,7 +20,7 @@ class custom_loss(nn.Module):
         return torch.mean(torch.pow((w_n - t_n), 2))
 
 # Define the training loop
-def start_train(dataset, subset_rate, train_model, water_model, optimizer, device, query, response,num_epochs=10, new_loss_r=0, default_loss_r=1):
+def start_train(dataset, subset_rate, train_model, water_model, optimizer, device, query, response,num_epochs=10, new_loss_r=0, default_loss_r=1, excluded_index=None):
     
     for epoch in range(num_epochs):
         
@@ -28,7 +28,7 @@ def start_train(dataset, subset_rate, train_model, water_model, optimizer, devic
             
             # Generate subset data loader based on dataset
             if dataset == 'cifar10':
-                train_loader, val_loader, test_loader = get_cifar10_loaders_sub(subset_rate)
+                train_loader, val_loader, test_loader = get_cifar10_loaders_sub(subset_rate, excluded_index)
             elif dataset == 'cifar100':
                 train_loader, val_loader, test_loader = get_cifar100_loaders()
             elif dataset == 'svhn':
@@ -104,6 +104,9 @@ def start_train(dataset, subset_rate, train_model, water_model, optimizer, devic
             
         print(f"Now in epoch {epoch+1}...")
 
+        ave_neu_loss_per_epoch = 0.0
+        ave_ce_loss_per_epoch = 0.0
+
         for batch_idx, batch in enumerate(train_loader):
             
             hook_flag = True
@@ -156,8 +159,12 @@ def start_train(dataset, subset_rate, train_model, water_model, optimizer, devic
             loss.backward()
             optimizer.step()
         
-        neuron_loss_after_epoch.append(round(new_loss.item(),4))
-        crosse_loss_after_epoch.append(round(ce_loss.item(),4))
+        """ neuron_loss_after_epoch.append(round(new_loss.item(),4))
+        crosse_loss_after_epoch.append(round(ce_loss.item(),4)) """
+        ave_ce_loss_per_epoch /= len(train_loader)
+        ave_neu_loss_per_epoch /= len(train_loader)
+        neuron_loss_after_epoch.append(round(ave_neu_loss_per_epoch,4))
+        crosse_loss_after_epoch.append(round(ave_ce_loss_per_epoch,4))
         
         print("===============================1 epoch of training ends===============================")
         
@@ -210,7 +217,7 @@ def start_train(dataset, subset_rate, train_model, water_model, optimizer, devic
     print(f"CrossE loss after every epoch: {crosse_loss_after_epoch}")    
     return train_test_acc, train_query_acc, water_test_acc, water_query_acc    
 
-def start_train_ft(dataset, subset_rate, train_model, water_model, optimizer, device, query, response,num_epochs=10, new_loss_r=0, default_loss_r=1):    
+def start_train_ft(dataset, subset_rate, train_model, water_model, optimizer, device, query, response,num_epochs=10, new_loss_r=0, default_loss_r=1, excluded_index=None):    
     
     for epoch in range(num_epochs):
         
@@ -218,7 +225,7 @@ def start_train_ft(dataset, subset_rate, train_model, water_model, optimizer, de
             
             # Generate subset data loader based on dataset
             if dataset == 'cifar10':
-                train_loader, val_loader, test_loader = get_cifar10_loaders_sub(subset_rate)
+                train_loader, val_loader, test_loader = get_cifar10_loaders_sub(subset_rate, excluded_index)
             elif dataset == 'cifar100':
                 train_loader, val_loader, test_loader = get_cifar100_loaders()
             elif dataset == 'svhn':
@@ -305,7 +312,7 @@ def start_train_ft(dataset, subset_rate, train_model, water_model, optimizer, de
     print(f"CrossE loss after every epoch: {crosse_loss_after_epoch}")    
     return train_test_acc, train_query_acc, water_test_acc, water_query_acc  
 
-def start_train_r(dataset, subset_rate, train_model, water_model, optimizer, device, query, response,num_epochs=10, new_loss_r=0, default_loss_r=1):
+def start_train_r(dataset, subset_rate, train_model, water_model, optimizer, device, query, response,num_epochs=10, new_loss_r=0, default_loss_r=1, excluded_index=None):
     
     for epoch in range(num_epochs):
         
@@ -313,7 +320,7 @@ def start_train_r(dataset, subset_rate, train_model, water_model, optimizer, dev
             
             # Generate subset data loader based on dataset
             if dataset == 'cifar10':
-                train_loader, val_loader, test_loader = get_cifar10_loaders_sub(subset_rate)
+                train_loader, val_loader, test_loader = get_cifar10_loaders_sub(subset_rate, excluded_index)
             elif dataset == 'cifar100':
                 train_loader, val_loader, test_loader = get_cifar100_loaders()
             elif dataset == 'svhn':
@@ -389,6 +396,9 @@ def start_train_r(dataset, subset_rate, train_model, water_model, optimizer, dev
             
         print(f"Now in epoch {epoch+1}...")
 
+        ave_neu_loss_per_epoch = 0.0
+        ave_ce_loss_per_epoch = 0.0
+        
         for batch_idx, batch in enumerate(train_loader):
             
             hook_flag = True
@@ -433,16 +443,27 @@ def start_train_r(dataset, subset_rate, train_model, water_model, optimizer, dev
                 print(f"{batch_idx+1} batch ce loss: {ce_loss.item()}")      
             
             # Combine both losses
-            loss = (default_loss_r)*ce_loss + (new_loss_r)*(1/new_loss)
+            if new_loss == 0:
+                loss = (default_loss_r)*ce_loss
+            else:
+                loss = (default_loss_r)*ce_loss + (new_loss_r)*(1/new_loss)
             if batch_idx % 5 == 0:
                 print(f"{batch_idx+1} batch combined loss: {loss.item()}")
+            
+            ave_neu_loss_per_epoch += new_loss.item()
+            ave_ce_loss_per_epoch += ce_loss.item()
+            
             
             #train_model.train()
             loss.backward()
             optimizer.step()
         
-        neuron_loss_after_epoch.append(round(new_loss.item(),4))
-        crosse_loss_after_epoch.append(round(ce_loss.item(),4))
+        """ neuron_loss_after_epoch.append(round(new_loss.item(),4))
+        crosse_loss_after_epoch.append(round(ce_loss.item(),4)) """
+        ave_ce_loss_per_epoch /= len(train_loader)
+        ave_neu_loss_per_epoch /= len(train_loader)
+        neuron_loss_after_epoch.append(round(ave_neu_loss_per_epoch,4))
+        crosse_loss_after_epoch.append(round(ave_ce_loss_per_epoch,4))
         
         print("===============================1 epoch of training ends===============================")
         
@@ -529,16 +550,16 @@ if __name__ == "__main__":
     ########################### Hyperparameters setting ###########################
     dataset = 'cifar10'
     subset_rate = 0.1 # 0~1
-    epoch = 20
+    epoch = 2
     default_loss_ratio = 1 # >=0
-    new_loss_ratio = 1 # >=0
+    new_loss_ratio = 1# >=0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Device: ", device)
     ###############################################################################
 
 
     # Load the existing checkpoint
-    checkpoint = torch.load('./experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt') # C:/Users/Someone/margin-based-watermarking/experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt
+    checkpoint = torch.load('./experiments/cifar10_res34_margin_100_queryindices/checkpoints/checkpoint_query_best.pt') # C:/Users/Someone/margin-based-watermarking/experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt
     # Preparation for loading
     CIFAR_QUERY_SIZE = (3, 32, 32) # input size
     response_scale = 10 # number of classes
@@ -552,9 +573,10 @@ if __name__ == "__main__":
     # Load the optimizer from checkpoint
     opt = torch.optim.SGD(train_model.parameters(), lr=0.1)
     opt.load_state_dict(checkpoint['optimizer'])
-    # Load the query from checkpoint
+    # Load the query from checkpoint and the index of them
     query = checkpoint['query_model']['state_dict']['query']
     query.to("cpu")
+    query_indices = checkpoint['query_model']['index']
     # Load the response from checkpoint
     response = checkpoint['query_model']['state_dict']['response']
     # Load the original response from checkpoint
@@ -570,7 +592,7 @@ if __name__ == "__main__":
     water_model.to(device)
 
     # Start training
-    train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train_r(dataset, subset_rate, train_model, water_model, opt, device, query, response, epoch, new_loss_ratio, default_loss_ratio)
+    train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train_r(dataset, subset_rate, train_model, water_model, opt, device, query, response, epoch, new_loss_ratio, default_loss_ratio, query_indices)
     
     # Print the results
     print(f"Training on {subset_rate} of {dataset} with old/new loss ratio {default_loss_ratio}/{new_loss_ratio} for {epoch} epochs.")
