@@ -735,7 +735,7 @@ def start_train_kd_r(dataset, subset_rate, train_model, water_model, optimizer, 
     print('===============================Finished Training===============================')
     print('===============================Finished Training===============================')
     print(f"Neuron loss after every epoch: {neuron_loss_after_epoch}")
-    print(f"CrossE loss after every epoch: {crosse_loss_after_epoch}")    
+    print(f"K.D. loss after every epoch: {crosse_loss_after_epoch}")    
     return train_test_acc, train_query_acc, water_test_acc, water_query_acc       
 
 def model_on_testset(test_model, test_loader, device):
@@ -817,7 +817,7 @@ if __name__ == "__main__":
     train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train_kd_r(dataset, subset_rate, train_model, water_model, opt, device, query, response, epoch, new_loss_ratio, default_loss_ratio, query_indices)
     
     # Print the results
-    print(f"Training on {subset_rate} of {dataset} with old/new loss ratio {default_loss_ratio}/{new_loss_ratio} for {epoch} epochs.")
+    print(f"===============================Training on {subset_rate} of {dataset} with old/new loss ratio {default_loss_ratio}/{new_loss_ratio} for {epoch} epochs.===============================")
     print("Train model Test Acc:", train_test_acc)
     print("Train model Query Acc:", train_query_acc)
     print("Water model Test Acc:", water_test_acc)
