@@ -58,8 +58,8 @@ def custom_loss1(water_model, train_model, trigger=1e-3):
         mask = train_model!=0
         train_one[mask] = train_model[mask]/t_denominator[mask]
         
-        #
-        water_one[mask_w] = torch.sign(train_one[mask_w]-1)*water_one[mask_w]
+        # To give the right direction of gradient when the value from fix tensor is 0
+        water_one[mask_w] = (torch.sign(train_one[mask_w])-1)*water_one[mask_w]
 
        
         ''' for idx in range(len(train_one)):
@@ -208,6 +208,9 @@ def start_train(dataset, subset_rate, train_model, water_model, optimizer, devic
             loss = (default_loss_r)*ce_loss - (new_loss_r)*new_loss
             if batch_idx % 5 == 0:
                 print(f"{batch_idx+1} batch combined loss: {loss.item()}")
+            
+            ave_neu_loss_per_epoch += new_loss.item()
+            ave_ce_loss_per_epoch += ce_loss.item()
             
             #train_model.train()
             loss.backward()
@@ -931,7 +934,7 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             images, labels = images.to(device), labels.to(device)
             
             train_model.train()
-            water_model.eval() # If not set to eval(), the model will still changing even if not being opt.step()
+            water_model.eval() # If not set to eval(), the model will still changing even if not being opt.step(), due to the change of BN layer during the forward process
             
             outputs = train_model(images)
             with torch.no_grad():
