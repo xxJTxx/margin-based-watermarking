@@ -2,6 +2,8 @@ import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
+
 from models import mnist, cifar10, resnet, queries
 #from torchsummary import summary
 from loaders import get_cifar10_loaders, get_cifar100_loaders, get_svhn_loaders, get_mnist_loaders,get_cifar10_loaders_sub
@@ -106,39 +108,39 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
                         train_relu.append(output)
 
                 # Hook the function onto conv1 and conv2 of layer1~layer4 of both models.
-                for idx in range(len(water_model[1].layer1)):
+                """ for idx in range(len(water_model[1].layer1)):
                     for name, module in water_model[1].layer1[idx].named_children():
                         if name in layer_output:
-                            w_hooks.append(getattr(water_model[1].layer1[idx], name).register_forward_hook(water_hook))
+                            w_hooks.append(getattr(water_model[1].layer1[idx], name).register_forward_hook(water_hook)) """
                 """" for idx in range(len(water_model[1].layer2)):
                     for name, module in water_model[1].layer2[idx].named_children():
-                        if name in ['conv1','conv2']:
+                        if name in layer_output:
                             w_hooks.append(getattr(water_model[1].layer2[idx], name).register_forward_hook(water_hook)) """
-                """ for idx in range(len(water_model[1].layer3)):
+                for idx in range(len(water_model[1].layer3)):
                     for name, module in water_model[1].layer3[idx].named_children():
-                        if name in ['conv1','conv2']:
-                            w_hooks.append(getattr(water_model[1].layer3[idx], name).register_forward_hook(water_hook)) """
-                """ for idx in range(len(water_model[1].layer4)):
+                        if name in layer_output:
+                            w_hooks.append(getattr(water_model[1].layer3[idx], name).register_forward_hook(water_hook))
+                for idx in range(len(water_model[1].layer4)):
                     for name, module in water_model[1].layer4[idx].named_children():
-                        if name in ['conv1','conv2']:
-                            w_hooks.append(getattr(water_model[1].layer4[idx], name).register_forward_hook(water_hook)) """
+                        if name in layer_output:
+                            w_hooks.append(getattr(water_model[1].layer4[idx], name).register_forward_hook(water_hook))
             
-                for idx in range(len(train_model[1].layer1)):
+                """ for idx in range(len(train_model[1].layer1)):
                     for name, module in train_model[1].layer1[idx].named_children():
                         if name in layer_output:
-                            t_hooks.append(getattr(train_model[1].layer1[idx], name).register_forward_hook(train_hook))
+                            t_hooks.append(getattr(train_model[1].layer1[idx], name).register_forward_hook(train_hook)) """
                 """ for idx in range(len(train_model[1].layer2)):
                     for name, module in train_model[1].layer2[idx].named_children():
-                        if name in ['conv1','conv2']:
+                        if name in layer_output:
                             t_hooks.append(getattr(train_model[1].layer2[idx], name).register_forward_hook(train_hook)) """
-                """ for idx in range(len(train_model[1].layer3)):
+                for idx in range(len(train_model[1].layer3)):
                     for name, module in train_model[1].layer3[idx].named_children():
-                        if name in ['conv1','conv2']:
-                            t_hooks.append(getattr(train_model[1].layer3[idx], name).register_forward_hook(train_hook)) """
-                """ for idx in range(len(train_model[1].layer4)):
+                        if name in layer_output:
+                            t_hooks.append(getattr(train_model[1].layer3[idx], name).register_forward_hook(train_hook))
+                for idx in range(len(train_model[1].layer4)):
                     for name, module in train_model[1].layer4[idx].named_children():
-                        if name in ['conv1','conv2']:
-                            t_hooks.append(getattr(train_model[1].layer4[idx], name).register_forward_hook(train_hook)) """
+                        if name in layer_output:
+                            t_hooks.append(getattr(train_model[1].layer4[idx], name).register_forward_hook(train_hook))
                 
                 print(f"{len(w_hooks)} and {len(t_hooks)} layers of output are being recorded on water/train model.")
 
@@ -158,39 +160,39 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
                         nonlocal train_relu1
                         train_relu1.append(input)
                 # Hook the function onto conv1 and conv2 of layer1~layer4 of both models.
-                for idx in range(len(water_model[1].layer1)):
+                """ for idx in range(len(water_model[1].layer1)):
                     for name, module in water_model[1].layer1[idx].named_children():
                         if name in layer_input:
-                            w_hooks1.append(getattr(water_model[1].layer1[idx], name).register_forward_hook(water_hook1))
+                            w_hooks1.append(getattr(water_model[1].layer1[idx], name).register_forward_hook(water_hook1)) """
                 """" for idx in range(len(water_model[1].layer2)):
                     for name, module in water_model[1].layer2[idx].named_children():
-                        if name in ['conv1','conv2']:
-                            w_hooks.append(getattr(water_model[1].layer2[idx], name).register_forward_hook(water_hook)) """
-                """ for idx in range(len(water_model[1].layer3)):
+                        if name in layer_input:
+                            w_hooks1.append(getattr(water_model[1].layer2[idx], name).register_forward_hook(water_hook1)) """
+                for idx in range(len(water_model[1].layer3)):
                     for name, module in water_model[1].layer3[idx].named_children():
-                        if name in ['conv1','conv2']:
-                            w_hooks.append(getattr(water_model[1].layer3[idx], name).register_forward_hook(water_hook)) """
-                """ for idx in range(len(water_model[1].layer4)):
+                        if name in layer_input:
+                            w_hooks1.append(getattr(water_model[1].layer3[idx], name).register_forward_hook(water_hook1))
+                for idx in range(len(water_model[1].layer4)):
                     for name, module in water_model[1].layer4[idx].named_children():
-                        if name in ['conv1','conv2']:
-                            w_hooks.append(getattr(water_model[1].layer4[idx], name).register_forward_hook(water_hook)) """
+                        if name in layer_input:
+                            w_hooks1.append(getattr(water_model[1].layer4[idx], name).register_forward_hook(water_hook1))
             
-                for idx in range(len(train_model[1].layer1)):
+                """ for idx in range(len(train_model[1].layer1)):
                     for name, module in train_model[1].layer1[idx].named_children():
                         if name in layer_input:
-                            t_hooks1.append(getattr(train_model[1].layer1[idx], name).register_forward_hook(train_hook1))
+                            t_hooks1.append(getattr(train_model[1].layer1[idx], name).register_forward_hook(train_hook1)) """
                 """ for idx in range(len(train_model[1].layer2)):
                     for name, module in train_model[1].layer2[idx].named_children():
-                        if name in ['conv1','conv2']:
-                            t_hooks.append(getattr(train_model[1].layer2[idx], name).register_forward_hook(train_hook)) """
-                """ for idx in range(len(train_model[1].layer3)):
+                        if name in layer_input:
+                            t_hooks1.append(getattr(train_model[1].layer2[idx], name).register_forward_hook(train_hook1)) """
+                for idx in range(len(train_model[1].layer3)):
                     for name, module in train_model[1].layer3[idx].named_children():
-                        if name in ['conv1','conv2']:
-                            t_hooks.append(getattr(train_model[1].layer3[idx], name).register_forward_hook(train_hook)) """
-                """ for idx in range(len(train_model[1].layer4)):
+                        if name in layer_input:
+                            t_hooks1.append(getattr(train_model[1].layer3[idx], name).register_forward_hook(train_hook1))
+                for idx in range(len(train_model[1].layer4)):
                     for name, module in train_model[1].layer4[idx].named_children():
-                        if name in ['conv1','conv2']:
-                            t_hooks.append(getattr(train_model[1].layer4[idx], name).register_forward_hook(train_hook)) """
+                        if name in layer_input:
+                            t_hooks1.append(getattr(train_model[1].layer4[idx], name).register_forward_hook(train_hook1))
                 
                 print(f"{len(w_hooks1)} and {len(t_hooks1)} layers of input are being recorded on water/train model.")
                      
@@ -256,14 +258,23 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             if batch_idx % 5 == 0:
                 print(f"{batch_idx+1} batch relu neuron loss: {relu_new_loss.item()}")  
             
-            kd_loss = loss_fn_kd(outputs, labels, outputs_water, 0.9, 20)
+            #kd_loss = loss_fn_kd(outputs, labels, outputs_water, 0.9, 20)
+            kd_loss = F.cross_entropy(outputs, labels)
+             
             if batch_idx % 5 == 0:
                 print(f"{batch_idx+1} batch kd loss: {kd_loss.item()}")      
             
             # Combine both losses
-            loss = (default_loss_r)*kd_loss + (new_loss_r)*(new_loss)
-            if batch_idx % 5 == 0:
-                print(f"{batch_idx+1} batch combined loss: {loss.item()}")
+            # if default_loss_r is passed in with fixed value
+            if not callable(default_loss_r):
+                loss = (default_loss_r)*kd_loss + (new_loss_r)*(new_loss)
+                if batch_idx % 5 == 0:
+                    print(f"{batch_idx+1} batch {default_loss_r}:{new_loss_r} combined loss: {loss.item()}")
+            # if default_loss_r is passed in with non_fixed ratio (new_loss_r will be replaced with the number calculated below and ignore what was passing into this function)
+            else:
+                loss = 10*(10*(default_loss_r(epoch))*kd_loss + (1-default_loss_r(epoch))*(new_loss))
+                if batch_idx % 5 == 0:
+                    print(f"{batch_idx+1} batch non_fixed {default_loss_r(epoch)}:{1-default_loss_r(epoch)} combined loss: {loss.item()}")
             
             ave_neu_loss_per_epoch += new_loss.item()
             ave_task_loss_per_epoch += kd_loss.item()
@@ -272,15 +283,16 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             
             loss.backward()
             optimizer.step()
+    
+        if epoch % 2 == 0:    
+            ave_task_loss_per_epoch /= len(train_loader)
+            ave_neu_loss_per_epoch /= len(train_loader)
+            neuron_loss_after_epoch.append(round(ave_neu_loss_per_epoch,4))
+            task_loss_after_epoch.append(round(ave_task_loss_per_epoch,4))
         
-        ave_task_loss_per_epoch /= len(train_loader)
-        ave_neu_loss_per_epoch /= len(train_loader)
-        neuron_loss_after_epoch.append(round(ave_neu_loss_per_epoch,4))
-        task_loss_after_epoch.append(round(ave_task_loss_per_epoch,4))
-        
-        # TO CHECK RELU RESULT
-        ave_relu_neu_loss_per_epoch /= len(train_loader)
-        relu_neuron_loss_after_epoch.append(round(ave_relu_neu_loss_per_epoch,4))
+            # TO CHECK RELU RESULT
+            ave_relu_neu_loss_per_epoch /= len(train_loader)
+            relu_neuron_loss_after_epoch.append(round(ave_relu_neu_loss_per_epoch,4))
         
         print("===============================1 epoch of training ends===============================")
         
@@ -305,18 +317,20 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             val_epoch_loss = val_loss / len(val_loader.dataset)
             val_accuracy = correct / total
             print(f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {val_epoch_loss:.4f}, Validation Accuracy: {val_accuracy:.4f}")
-          
-        #Testing both model
-        print("Train Model Test Process...")
-        train_test_acc.append(model_on_testset(train_model, test_loader, device))
-        print("Water Model Test Process...")
-        water_test_acc.append(model_on_testset(water_model, test_loader, device))
-
-        # Query both models
-        print("Train Model Query Process...")
-        train_query_acc.append(round(model_on_queryset(train_model, query, response, device).item(),4))
-        print("Water Model Query Process...")
-        water_query_acc.append(round(model_on_queryset(water_model, query, response, device).item(),4))
+        
+        if epoch % 2 == 0:   
+            #Testing train model
+            print("Train Model Test Process...")
+            train_test_acc.append(model_on_testset(train_model, test_loader, device))
+            # Query train models
+            print("Train Model Query Process...")
+            train_query_acc.append(round(model_on_queryset(train_model, query, response, device).item(),4))
+        
+        if epoch == 0 or epoch == num_epochs-1:    
+            print("Water Model Test Process...")
+            water_test_acc.append(model_on_testset(water_model, test_loader, device))
+            print("Water Model Query Process...")
+            water_query_acc.append(round(model_on_queryset(water_model, query, response, device).item(),4))
         
     # Remove hooks for model after used and reset the handle lists
     for handle in w_hooks:
@@ -379,13 +393,17 @@ if __name__ == "__main__":
     ########################### Hyperparameters setting ###########################
     dataset = 'cifar10'
     subset_rate = 0.1 # 0~1
-    epoch = 2
-    default_loss_ratio = 1 # >=0
-    new_loss_ratio = 1# >=0
+    epoch = 1
+    default_loss_ratio = 200 # >=0
+    new_loss_ratio = 0# >=0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Device: ", device)
-    layer_input = ['conv1']
-    layer_output = ['conv2']
+    layer_input = ['conv2'] # List of layers that input will be used as relu loss input
+    layer_output = ['conv1'] # List of layers that output will be used as custom loss input
+    # Non-fixed loss ratio
+    default_loss_scheduler = lambda t: np.interp([t],\
+            [0, 4, 4, 20],\
+            [0.75, 0.75, 1, 1])[0]
     ###############################################################################
 
 
@@ -400,7 +418,7 @@ if __name__ == "__main__":
     # Load the model  structure from checkpoint
     train_model = model_archive[checkpoint['model']['type']](num_classes=response_scale)
     # Load the model weights
-    train_model.load_state_dict(checkpoint['model']['state_dict'])
+    #train_model.load_state_dict(checkpoint['model']['state_dict'])
     # Load the optimizer from checkpoint
     opt = torch.optim.SGD(train_model.parameters(), lr=0.1)
     opt.load_state_dict(checkpoint['optimizer'])
@@ -422,6 +440,8 @@ if __name__ == "__main__":
     train_model.to(device)
     water_model.to(device)
 
+    
+    
     # Start training
     train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train_kd_loss1(dataset, subset_rate, train_model, water_model, opt, device, query, response, epoch, new_loss_ratio, default_loss_ratio, query_indices, layer_input, layer_output)
     
@@ -429,8 +449,8 @@ if __name__ == "__main__":
     print(f"===============================Training on {subset_rate} of {dataset} with old/new loss ratio {default_loss_ratio}/{new_loss_ratio} for {epoch} epochs.===============================")
     print("Train model Test Acc:", train_test_acc)
     print("Train model Query Acc:", train_query_acc)
-    print("Water model Test Acc:", water_test_acc)
-    print("Water model Query Acc:", water_query_acc)
+    print(f"Water model Test/Query Acc:{water_test_acc}/ {water_query_acc}")
+    
     
     breakpoint()
     
