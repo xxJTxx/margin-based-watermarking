@@ -85,8 +85,8 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             train_test_acc = []
             water_query_acc = []
             train_query_acc = []
-            neuron_loss_after_epoch = [] # To reduce variable, first item stores the acc of water model on testing before training 
-            task_loss_after_epoch = [] # To reduce variable, first item stores the acc of water model on query before training
+            neuron_loss_after_epoch = [] 
+            task_loss_after_epoch = [] 
             # TO CHECK RELU RESULT
             relu_neuron_loss_after_epoch =[]
             
@@ -112,7 +112,7 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
                     for name, module in water_model[1].layer1[idx].named_children():
                         if name in layer_output:
                             w_hooks.append(getattr(water_model[1].layer1[idx], name).register_forward_hook(water_hook)) """
-                """" for idx in range(len(water_model[1].layer2)):
+                """ for idx in range(len(water_model[1].layer2)):
                     for name, module in water_model[1].layer2[idx].named_children():
                         if name in layer_output:
                             w_hooks.append(getattr(water_model[1].layer2[idx], name).register_forward_hook(water_hook)) """
@@ -164,7 +164,7 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
                     for name, module in water_model[1].layer1[idx].named_children():
                         if name in layer_input:
                             w_hooks1.append(getattr(water_model[1].layer1[idx], name).register_forward_hook(water_hook1)) """
-                """" for idx in range(len(water_model[1].layer2)):
+                """ for idx in range(len(water_model[1].layer2)):
                     for name, module in water_model[1].layer2[idx].named_children():
                         if name in layer_input:
                             w_hooks1.append(getattr(water_model[1].layer2[idx], name).register_forward_hook(water_hook1)) """
@@ -196,8 +196,20 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
                 
                 print(f"{len(w_hooks1)} and {len(t_hooks1)} layers of input are being recorded on water/train model.")
                      
+        if epoch == 0 :    
+            """ #Testing train model
+            print("Train Model Main Task acc before training...")
+            train_test_acc.append(model_on_testset(train_model, test_loader, device))
+            # Query train models
+            print("Train Model Query acc before training...")
+            train_query_acc.append(round(model_on_queryset(train_model, query, response, device).item(),4)) """
+            print("Train model main/query acc eval...")
+            main_acc = model_on_testset(train_model, test_loader, device)
+            query_acc = round(model_on_queryset(train_model, query, response, device).item(),2)
+            train_test_acc.append(f"{main_acc}/{query_acc}")
+        
             
-        print(f"Now in epoch {epoch+1}...")
+        print(f"===============================Now in epoch {epoch+1}...===============================")
 
         # To track performance of the two losses
         ave_neu_loss_per_epoch = 0.0
@@ -234,11 +246,7 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
                     breakpoint()
                 elif len(water_relu) != len(train_relu):
                     print("The length of water_relu and train_relu are not equal...")
-                    breakpoint()
-                
-                if batch_idx % 5 == 0:
-                    print(f"{len(water_relu)} layers are store in the water_lists...")
-                    print(f"{len(train_relu)} layers are store in the train_lists...")    
+                    breakpoint()  
             
              # Reset new_loss
             new_loss = 0.0
@@ -246,8 +254,8 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             for idx in range(len(water_relu)):
                 new_loss += custom_loss1(water_relu[idx][0].detach(), train_relu[idx][0]) / len(water_relu)
 
-            if batch_idx % 5 == 0:
-                print(f"{batch_idx+1} batch neuron loss: {new_loss.item()}")    
+            """ if batch_idx % 5 == 0:
+                print(f"{batch_idx+1} batch neuron loss: {new_loss.item()}")     """
             
             # TO CHECK RELU RESULT
             relu_new_loss = 0.0
@@ -255,26 +263,26 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             for idx in range(len(water_relu1)):
                 relu_new_loss += relu_neu_loss(water_relu1[idx][0].detach(), train_relu1[idx][0].detach()) / len(water_relu1)
  
-            if batch_idx % 5 == 0:
-                print(f"{batch_idx+1} batch relu neuron loss: {relu_new_loss.item()}")  
+            """ if batch_idx % 5 == 0:
+                print(f"{batch_idx+1} batch relu neuron loss: {relu_new_loss.item()}")   """
             
-            #kd_loss = loss_fn_kd(outputs, labels, outputs_water, 0.9, 20)
-            kd_loss = F.cross_entropy(outputs, labels)
+            kd_loss = loss_fn_kd(outputs, labels, outputs_water, 1, 20)
+            #kd_loss = F.cross_entropy(outputs, labels)
              
-            if batch_idx % 5 == 0:
-                print(f"{batch_idx+1} batch kd loss: {kd_loss.item()}")      
+            """ if batch_idx % 5 == 0:
+                print(f"{batch_idx+1} batch kd loss: {kd_loss.item()}") """      
             
             # Combine both losses
             # if default_loss_r is passed in with fixed value
             if not callable(default_loss_r):
                 loss = (default_loss_r)*kd_loss + (new_loss_r)*(new_loss)
-                if batch_idx % 5 == 0:
-                    print(f"{batch_idx+1} batch {default_loss_r}:{new_loss_r} combined loss: {loss.item()}")
+                """ if batch_idx % 5 == 0:
+                    print(f"{batch_idx+1} batch {default_loss_r}:{new_loss_r} combined loss: {loss.item()}") """
             # if default_loss_r is passed in with non_fixed ratio (new_loss_r will be replaced with the number calculated below and ignore what was passing into this function)
             else:
                 loss = 10*(10*(default_loss_r(epoch))*kd_loss + (1-default_loss_r(epoch))*(new_loss))
-                if batch_idx % 5 == 0:
-                    print(f"{batch_idx+1} batch non_fixed {default_loss_r(epoch)}:{1-default_loss_r(epoch)} combined loss: {loss.item()}")
+                """ if batch_idx % 5 == 0:
+                    print(f"{batch_idx+1} batch non_fixed {default_loss_r(epoch)}:{1-default_loss_r(epoch)} combined loss: {loss.item()}") """
             
             ave_neu_loss_per_epoch += new_loss.item()
             ave_task_loss_per_epoch += kd_loss.item()
@@ -283,7 +291,12 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             
             loss.backward()
             optimizer.step()
-    
+
+        if callable(default_loss_r):
+            print(f"Non-fixed loss ratio: {default_loss_r(epoch)}:{1-default_loss_r(epoch)}")
+        else:
+            print(f"Fixed ratio: {default_loss_r}:{new_loss_r}")
+        
         if epoch % 2 == 0:    
             ave_task_loss_per_epoch /= len(train_loader)
             ave_neu_loss_per_epoch /= len(train_loader)
@@ -294,7 +307,6 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             ave_relu_neu_loss_per_epoch /= len(train_loader)
             relu_neuron_loss_after_epoch.append(round(ave_relu_neu_loss_per_epoch,4))
         
-        print("===============================1 epoch of training ends===============================")
         
         # Validate the model
         train_model.eval()
@@ -320,17 +332,25 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
         
         if epoch % 2 == 0:   
             #Testing train model
-            print("Train Model Test Process...")
+            """ print("Train Model Test Process...")
             train_test_acc.append(model_on_testset(train_model, test_loader, device))
             # Query train models
             print("Train Model Query Process...")
-            train_query_acc.append(round(model_on_queryset(train_model, query, response, device).item(),4))
+            train_query_acc.append(round(model_on_queryset(train_model, query, response, device).item(),4)) """
+            print("Train model main/query acc eval...")
+            main_acc = model_on_testset(train_model, test_loader, device)
+            query_acc = round(model_on_queryset(train_model, query, response, device).item(),2)
+            train_test_acc.append(f"{main_acc}/{query_acc}")
         
         if epoch == 0 or epoch == num_epochs-1:    
-            print("Water Model Test Process...")
+            """ print("Water Model Test Process...")
             water_test_acc.append(model_on_testset(water_model, test_loader, device))
             print("Water Model Query Process...")
-            water_query_acc.append(round(model_on_queryset(water_model, query, response, device).item(),4))
+            water_query_acc.append(round(model_on_queryset(water_model, query, response, device).item(),4)) """
+            print("Water model main/query acc eval...")
+            main_acc = model_on_testset(water_model, test_loader, device)
+            query_acc = round(model_on_queryset(water_model, query, response, device).item(),2)
+            water_test_acc.append(f"{main_acc}/{query_acc}")
         
     # Remove hooks for model after used and reset the handle lists
     for handle in w_hooks:
@@ -393,7 +413,7 @@ if __name__ == "__main__":
     ########################### Hyperparameters setting ###########################
     dataset = 'cifar10'
     subset_rate = 0.1 # 0~1
-    epoch = 1
+    epoch = 3
     default_loss_ratio = 200 # >=0
     new_loss_ratio = 0# >=0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -402,13 +422,13 @@ if __name__ == "__main__":
     layer_output = ['conv1'] # List of layers that output will be used as custom loss input
     # Non-fixed loss ratio
     default_loss_scheduler = lambda t: np.interp([t],\
-            [0, 4, 4, 20],\
-            [0.75, 0.75, 1, 1])[0]
+            [0, 10, 10, 50],\
+            [0.8, 0.9, 0.99, 0.99])[0]
     ###############################################################################
 
 
     # Load the existing checkpoint
-    checkpoint = torch.load('./experiments/cifar10_res34_margin_100_queryindices/checkpoints/checkpoint_query_best.pt') # C:/Users/Someone/margin-based-watermarking/experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt
+    checkpoint = torch.load('./experiments/cifar10_res18_margin_100_/checkpoints/checkpoint_query_best.pt') # C:/Users/Someone/margin-based-watermarking/experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt
     # Preparation for loading
     CIFAR_QUERY_SIZE = (3, 32, 32) # input size
     response_scale = 10 # number of classes
@@ -418,9 +438,9 @@ if __name__ == "__main__":
     # Load the model  structure from checkpoint
     train_model = model_archive[checkpoint['model']['type']](num_classes=response_scale)
     # Load the model weights
-    #train_model.load_state_dict(checkpoint['model']['state_dict'])
+    train_model.load_state_dict(checkpoint['model']['state_dict'])
     # Load the optimizer from checkpoint
-    opt = torch.optim.SGD(train_model.parameters(), lr=0.1)
+    opt = torch.optim.SGD(train_model.parameters(), lr=0.001)
     opt.load_state_dict(checkpoint['optimizer'])
     # Load the query from checkpoint and the index of them
     query = checkpoint['query_model']['state_dict']['query']
@@ -443,13 +463,13 @@ if __name__ == "__main__":
     
     
     # Start training
-    train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train_kd_loss1(dataset, subset_rate, train_model, water_model, opt, device, query, response, epoch, new_loss_ratio, default_loss_ratio, query_indices, layer_input, layer_output)
+    train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train_kd_loss1(dataset, subset_rate, train_model, water_model, opt, device, query, response, epoch, new_loss_ratio, default_loss_scheduler, query_indices, layer_input, layer_output)
     
     # Print the results
     print(f"===============================Training on {subset_rate} of {dataset} with old/new loss ratio {default_loss_ratio}/{new_loss_ratio} for {epoch} epochs.===============================")
     print("Train model Test Acc:", train_test_acc)
-    print("Train model Query Acc:", train_query_acc)
-    print(f"Water model Test/Query Acc:{water_test_acc}/ {water_query_acc}")
+    #print("Train model Query Acc:", train_query_acc)
+    print(f"Water model Test/Query Acc:{water_test_acc}")
     
     
     breakpoint()
