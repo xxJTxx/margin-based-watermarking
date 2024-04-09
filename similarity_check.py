@@ -12,209 +12,216 @@ from loaders import get_cifar10_loaders, get_cifar100_loaders, get_svhn_loaders,
 # Custom Loss function that take into two models water_model and train_model, and return the mean squared error between output of certain layers
 def relu_neu_similarity(clean_relu, trigger_relu):
         if len(clean_relu) != len(trigger_relu): 
-            print('Relu length not matched') 
+            print('Relu length not matched')
+            breakpoint() 
         else:
             for idx in range(len(clean_relu)):
-                if clean_relu[idx][0].shape != trigger_relu[idx][0].shape:
-                    print(f'Clean Relu {clean_relu[idx][0].shape} and Trigger Relu {trigger_relu[idx][0].shape} not matched')
+                if clean_relu[idx].shape != trigger_relu[idx].shape:
+                    print(f'Clean Relu {clean_relu[idx].shape} and Trigger Relu {trigger_relu[idx].shape} not matched')
                     breakpoint()
             
-            return torch.mean(torch.abs(clean_relu - trigger_relu))
+            # Create a list to store the absolute differences
+            absolute_diff_list = []
+
+            # Iterate over the tensors in both lists and calculate the absolute difference
+            for tensor1, tensor2 in zip(clean_relu, trigger_relu):
+                absolute_diff = torch.abs(tensor1 - tensor2)
+                absolute_diff_list.append(absolute_diff)
+            
+            # Concatenate the tensors into a single tensor
+            concatenated_tensor = torch.cat([tensor.flatten() for tensor in absolute_diff_list])
+
+            # Calculate the mean of the concatenated tensor
+            mean_value = torch.mean(concatenated_tensor.float())
+            
+            return 1-mean_value
 
 # Neuron count
-def relu_neu_count(water_relu, sample_number):
+def relu_neu_count(water_relu, sample_num):
         w_denominator=water_relu.detach()       
         w_n = torch.where(water_relu !=0, water_relu/w_denominator, water_relu)
         
-        return w_n/sample_number
-
-# Custom Loss function
-def custom_loss1(water_model, train_model, trigger=1e-3):
-        # Denominator take abs value to maintain the sign
-        w_denominator=torch.abs(water_model.detach())
-        t_denominator=torch.abs(train_model.detach()) 
-        
-        # Creating a new tensor where negative/positive values are changed to -1/1, wheras 0 becomes 0+trigger
-        water_one = torch.FloatTensor(water_model.size()).type_as(water_model)
-        mask_w = water_model!=0
-        water_one[mask_w] = water_model[mask_w]/w_denominator[mask_w]
-        mask_w = water_model==0
-        water_one[mask_w] = water_model[mask_w] + trigger
-
-        # Creating a new tensor where negative/positive values are changed to -1/1, wheras 0 remains 0
-        mask = train_model==0
-        train_one = torch.FloatTensor(train_model.size()).type_as(train_model)
-        train_one[mask] = train_model[mask]
-        mask = train_model!=0
-        train_one[mask] = train_model[mask]/t_denominator[mask]
-        
-        # To give the right direction of gradient when the value from fix tensor is 0
-        water_one[mask_w] = (torch.sign(train_one[mask_w])-1)*water_one[mask_w]
-
-       
-        ''' for idx in range(len(train_one)):
-          print(f"w_o:{water_one[idx]}~~~t_o:{train_one[idx].item(),}") '''
-        return torch.mean(torch.pow((1 + water_one*train_one), 2))
+        return w_n/sample_num
 
 
-# Define the training loop
-def activated_neuron_similarity(dataset, subset_rate, water_model, device, query, response, excluded_index=None, layer_input=None):
+# Similarity Check
+def activated_neuron_similarity(dataset, subset_rate, water_model, device, query, excluded_index=None, layer_input=None):
+            
+    # Generate subset data loader based on dataset
+    if dataset == 'cifar10':
+        train_loader, val_loader, test_loader = get_cifar10_loaders_sub(subset_rate, excluded_index)
+    elif dataset == 'cifar100':
+        train_loader, val_loader, test_loader = get_cifar100_loaders()
+    elif dataset == 'svhn':
+        train_loader, val_loader, test_loader = get_svhn_loaders()
     
-    for epoch in range(1):
-        
-        if epoch == 0:
-            
-            # Generate subset data loader based on dataset
-            if dataset == 'cifar10':
-                train_loader, val_loader, test_loader = get_cifar10_loaders_sub(subset_rate, excluded_index)
-            elif dataset == 'cifar100':
-                train_loader, val_loader, test_loader = get_cifar100_loaders()
-            elif dataset == 'svhn':
-                train_loader, val_loader, test_loader = get_svhn_loaders()
-            
-            # Record activated neurons of two kinds of data
-            clean_activate_neuron_1 = []
-            clean_activate_neuron_2 = []
-            clean_activate_neuron_3 = []
-            clean_activate_neuron_4 = []
-            trigger_activate_neuron_1 = []
-            trigger_activate_neuron_2 = []
-            trigger_activate_neuron_3 = []
-            trigger_activate_neuron_4 = []
+    # Record activated neurons of two kinds of data
+    clean_activate_neuron_1 = []
+    clean_activate_neuron_2 = []
+    clean_activate_neuron_3 = []
+    clean_activate_neuron_4 = []
+    trigger_activate_neuron_1 = []
+    trigger_activate_neuron_2 = []
+    trigger_activate_neuron_3 = []
+    trigger_activate_neuron_4 = []
 
-            if layer_input is not None:    
+    if layer_input is not None:    
 
-                water_relu1 = []
-                w_hooks1 = [] # list of hook handles, to be removed when you are done
-                def water_hook1(module, input, output):
-                    if hook_flag:
-                        nonlocal water_relu1
-                        water_relu1.append(input)   
-                
-                water_relu2 = []
-                w_hooks2 = [] # list of hook handles, to be removed when you are done
-                def water_hook2(module, input, output):
-                    if hook_flag:
-                        nonlocal water_relu2
-                        water_relu2.append(input) 
-                        
-                water_relu3 = []
-                w_hooks3 = [] # list of hook handles, to be removed when you are done
-                def water_hook3(module, input, output):
-                    if hook_flag:
-                        nonlocal water_relu3
-                        water_relu3.append(input) 
-                
-                water_relu4 = []
-                w_hooks4 = [] # list of hook handles, to be removed when you are done
-                def water_hook4(module, input, output):
-                    if hook_flag:
-                        nonlocal water_relu4
-                        water_relu4.append(input) 
-               
-                
-                # Hook the function onto conv1 and conv2 of layer1~layer4 of both models.
-                for idx in range(len(water_model[1].layer1)):
-                    for name, module in water_model[1].layer1[idx].named_children():
-                        if name in layer_input:
-                            w_hooks1.append(getattr(water_model[1].layer1[idx], name).register_forward_hook(water_hook1))
-                for idx in range(len(water_model[1].layer2)):
-                    for name, module in water_model[1].layer2[idx].named_children():
-                        if name in layer_input:
-                            w_hooks2.append(getattr(water_model[1].layer2[idx], name).register_forward_hook(water_hook2))
-                for idx in range(len(water_model[1].layer3)):
-                    for name, module in water_model[1].layer3[idx].named_children():
-                        if name in layer_input:
-                            w_hooks3.append(getattr(water_model[1].layer3[idx], name).register_forward_hook(water_hook3))
-                for idx in range(len(water_model[1].layer4)):
-                    for name, module in water_model[1].layer4[idx].named_children():
-                        if name in layer_input:
-                            w_hooks4.append(getattr(water_model[1].layer4[idx], name).register_forward_hook(water_hook4))
+        water_relu1 = []
+        w_hooks1 = [] # list of hook handles, to be removed when you are done
+        def water_hook1(module, input, output):
+            if hook_flag:
+                nonlocal water_relu1
+                water_relu1.append(input)   
         
-                print(f"{len(w_hooks1)} and {len(w_hooks2)} and {len(w_hooks3)} and {len(w_hooks4)} layers of input are being recorded on water model.")
+        water_relu2 = []
+        w_hooks2 = [] # list of hook handles, to be removed when you are done
+        def water_hook2(module, input, output):
+            if hook_flag:
+                nonlocal water_relu2
+                water_relu2.append(input) 
+                
+        water_relu3 = []
+        w_hooks3 = [] # list of hook handles, to be removed when you are done
+        def water_hook3(module, input, output):
+            if hook_flag:
+                nonlocal water_relu3
+                water_relu3.append(input) 
+        
+        water_relu4 = []
+        w_hooks4 = [] # list of hook handles, to be removed when you are done
+        def water_hook4(module, input, output):
+            if hook_flag:
+                nonlocal water_relu4
+                water_relu4.append(input) 
+        
+        
+        # Hook the function onto conv1 and conv2 of layer1~layer4 of both models.
+        for idx in range(len(water_model[1].layer1)):
+            for name, module in water_model[1].layer1[idx].named_children():
+                if name in layer_input:
+                    w_hooks1.append(getattr(water_model[1].layer1[idx], name).register_forward_hook(water_hook1))
+        for idx in range(len(water_model[1].layer2)):
+            for name, module in water_model[1].layer2[idx].named_children():
+                if name in layer_input:
+                    w_hooks2.append(getattr(water_model[1].layer2[idx], name).register_forward_hook(water_hook2))
+        for idx in range(len(water_model[1].layer3)):
+            for name, module in water_model[1].layer3[idx].named_children():
+                if name in layer_input:
+                    w_hooks3.append(getattr(water_model[1].layer3[idx], name).register_forward_hook(water_hook3))
+        for idx in range(len(water_model[1].layer4)):
+            for name, module in water_model[1].layer4[idx].named_children():
+                if name in layer_input:
+                    w_hooks4.append(getattr(water_model[1].layer4[idx], name).register_forward_hook(water_hook4))
+
+        print(f"{len(w_hooks1)} and {len(w_hooks2)} and {len(w_hooks3)} and {len(w_hooks4)} layers of input are being recorded on water model.")
                     
-        
-            
-        print(f"===============================Now in epoch {epoch+1}...===============================")
 
-        water_model.eval()
-        
-        for batch_idx, batch in enumerate(test_loader):
-            
-            hook_flag = True
-            # Reset the lists
-            water_relu1 = []
-            water_relu2 = []
-            water_relu3 = []
-            water_relu4 = []            
-            
-            images = batch[0]
-            labels = batch[1].long()         
-            images, labels = images.to(device), labels.to(device)
-        
-            with torch.no_grad():
-                _ = water_model(images) 
-
-            
-            # Add relu neuron into relu list
-            for idx in range(len(water_relu1)):
-                if idx/len(w_hooks1) == 0 and batch_idx == 0: # first smaple in the first batch should use append to create a item in list
-                    clean_activate_neuron_1.append(water_relu1[idx][0])
-                else: # otherwise will be summed up
-                    clean_activate_neuron_1[idx%len(w_hooks1)][0] += relu_neu_count(water_relu1[idx][0],len(test_loader))
-
-            for idx in range(len(water_relu2)):
-                if idx/len(w_hooks2) == 0 and batch_idx == 0: # first smaple in the first batch should use append to create a item in list
-                    clean_activate_neuron_2.append(water_relu2[idx][0])
-                else: # otherwise will be summed up
-                    clean_activate_neuron_2[idx%len(w_hooks2)][0] += relu_neu_count(water_relu2[idx][0],len(test_loader))
-            
-            for idx in range(len(water_relu3)):
-                if idx/len(w_hooks3) == 0 and batch_idx == 0: # first smaple in the first batch should use append to create a item in list
-                    clean_activate_neuron_3.append(water_relu3[idx][0])
-                else: # otherwise will be summed up
-                    clean_activate_neuron_3[idx%len(w_hooks3)][0] += relu_neu_count(water_relu3[idx][0],len(test_loader))
-            
-            for idx in range(len(water_relu4)):
-                if idx/len(w_hooks4) == 0 and batch_idx == 0: # first smaple in the first batch should use append to create a item in list
-                    clean_activate_neuron_4.append(water_relu4[idx][0])
-                else: # otherwise will be summed up
-                    clean_activate_neuron_4[idx%len(w_hooks4)][0] += relu_neu_count(water_relu4[idx][0],len(test_loader))
-
+    water_model.eval()
+    
+    debugger = []
+    
+    for batch_idx, batch in enumerate(test_loader):
         
         hook_flag = True
         # Reset the lists
         water_relu1 = []
         water_relu2 = []
         water_relu3 = []
-        water_relu4 = []    
-        images, labels = query.to(device), response.to(device)
+        water_relu4 = []            
+        
+        images = batch[0]
+        labels = batch[1].long()         
+        images, labels = images.to(device), labels.to(device)
+    
         with torch.no_grad():
-            _ = water_model(images)    
+            _ = water_model(images) 
+
+        #breakpoint()
         # Add relu neuron into relu list
         for idx in range(len(water_relu1)):
-            if idx/len(w_hooks1) == 0 and batch_idx == 0: # first smaple in the first batch should use append to create a item in list
-                trigger_activate_neuron_1.append(water_relu1[idx][0])
-            else: # otherwise will be summed up
-                trigger_activate_neuron_1[idx%len(w_hooks1)][0] += relu_neu_count(water_relu1[idx][0],len(query))
-
+            for sample_idx in range(len(water_relu1[idx][0])):
+                if sample_idx == 0 and batch_idx == 0: # first smaple in the first batch should use append to create a item in list
+                    clean_activate_neuron_1.append(relu_neu_count(water_relu1[idx][0][sample_idx],10000))
+                    debugger.append(1)
+                else: # otherwise will be summed up
+                    #breakpoint()
+                    clean_activate_neuron_1[idx] += relu_neu_count(water_relu1[idx][0][sample_idx],10000)
+                    debugger[idx] += 1
+                    
         for idx in range(len(water_relu2)):
-            if idx/len(w_hooks2) == 0 and batch_idx == 0: # first smaple in the first batch should use append to create a item in list
-                trigger_activate_neuron_2.append(water_relu2[idx][0])
-            else: # otherwise will be summed up
-                trigger_activate_neuron_2[idx%len(w_hooks2)][0] += relu_neu_count(water_relu2[idx][0],len(query))
-        
+            for sample_idx in range(len(water_relu2[idx][0])):
+                if sample_idx == 0 and batch_idx == 0: # first smaple in the first batch should use append to create a item in list
+                    clean_activate_neuron_2.append(relu_neu_count(water_relu2[idx][0][sample_idx],10000))
+                else: # otherwise will be summed up
+                    #breakpoint()
+                    clean_activate_neuron_2[idx] += relu_neu_count(water_relu2[idx][0][sample_idx],10000)
+                    
         for idx in range(len(water_relu3)):
-            if idx/len(w_hooks3) == 0 and batch_idx == 0: # first smaple in the first batch should use append to create a item in list
-                trigger_activate_neuron_3.append(water_relu3[idx][0])
-            else: # otherwise will be summed up
-                trigger_activate_neuron_3[idx%len(w_hooks3)][0] += relu_neu_count(water_relu3[idx][0],len(query))
-        
+            for sample_idx in range(len(water_relu3[idx][0])):
+                if sample_idx == 0 and batch_idx == 0: # first smaple in the first batch should use append to create a item in list
+                    clean_activate_neuron_3.append(relu_neu_count(water_relu3[idx][0][sample_idx],10000))
+                else: # otherwise will be summed up
+                    #breakpoint()
+                    clean_activate_neuron_3[idx] += relu_neu_count(water_relu3[idx][0][sample_idx],10000)
+                
         for idx in range(len(water_relu4)):
-            if idx/len(w_hooks4) == 0 and batch_idx == 0: # first smaple in the first batch should use append to create a item in list
-                trigger_activate_neuron_4.append(water_relu4[idx][0])
+            for sample_idx in range(len(water_relu4[idx][0])):
+                if sample_idx == 0 and batch_idx == 0: # first smaple in the first batch should use append to create a item in list
+                    clean_activate_neuron_4.append(relu_neu_count(water_relu4[idx][0][sample_idx],10000))
+                else: # otherwise will be summed up
+                    #breakpoint()
+                    clean_activate_neuron_4[idx] += relu_neu_count(water_relu4[idx][0][sample_idx],10000)
+    
+
+    #print(f"Debugger clean: {debugger}")
+    debugger = []
+    
+    hook_flag = True
+    # Reset the lists
+    water_relu1 = []
+    water_relu2 = []
+    water_relu3 = []
+    water_relu4 = []    
+    images = query.to(device)
+    with torch.no_grad():
+        _ = water_model(images)    
+    # Add relu neuron into relu list
+    for idx in range(len(water_relu1)):
+        for sample_idx in range(len(water_relu1[idx][0])):
+            if sample_idx == 0 : # first smaple should use append to create a item in list
+                trigger_activate_neuron_1.append(relu_neu_count(water_relu1[idx][0][sample_idx],len(query)))
+                debugger.append(1)
             else: # otherwise will be summed up
-                trigger_activate_neuron_4[idx%len(w_hooks4)][0] += relu_neu_count(water_relu4[idx][0],len(query))        
+                #torbreakpoint()
+                trigger_activate_neuron_1[idx] += relu_neu_count(water_relu1[idx][0][sample_idx],len(query))
+                debugger[idx] += 1
+    
+    for idx in range(len(water_relu2)):
+        for sample_idx in range(len(water_relu2[idx][0])):
+            if sample_idx == 0 : # first smaple in the first batch should use append to create a item in list
+                trigger_activate_neuron_2.append(relu_neu_count(water_relu2[idx][0][sample_idx],len(query)))
+            else: # otherwise will be summed up
+                #breakpoint()
+                trigger_activate_neuron_2[idx] += relu_neu_count(water_relu2[idx][0][sample_idx],len(query))                
+    
+    for idx in range(len(water_relu3)):
+        for sample_idx in range(len(water_relu3[idx][0])):
+            if sample_idx == 0 : # first smaple in the first batch should use append to create a item in list
+                trigger_activate_neuron_3.append(relu_neu_count(water_relu3[idx][0][sample_idx],len(query)))
+            else: # otherwise will be summed up
+                #breakpoint()
+                trigger_activate_neuron_3[idx] += relu_neu_count(water_relu3[idx][0][sample_idx],len(query))
+                
+    for idx in range(len(water_relu4)):
+        for sample_idx in range(len(water_relu4[idx][0])):
+            if sample_idx == 0 : # first smaple in the first batch should use append to create a item in list
+                trigger_activate_neuron_4.append(relu_neu_count(water_relu4[idx][0][sample_idx],len(query)))
+            else: # otherwise will be summed up
+                #breakpoint()
+                trigger_activate_neuron_4[idx] += relu_neu_count(water_relu4[idx][0][sample_idx],len(query))        
+    
+    #print(f"Debugger trigger: {debugger}")
 
     print(f"Layer1 similarity: {relu_neu_similarity(clean_activate_neuron_1, trigger_activate_neuron_1)}")
     print(f"Layer2 similarity: {relu_neu_similarity(clean_activate_neuron_2, trigger_activate_neuron_2)}")
@@ -277,22 +284,15 @@ if __name__ == "__main__":
     ########################### Hyperparameters setting ###########################
     dataset = 'cifar10'
     subset_rate = 0.1 # 0~1
-    epoch = 3
-    default_loss_ratio = 200 # >=0
-    new_loss_ratio = 0# >=0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Device: ", device)
     layer_input = ['conv1','conv2'] # List of layers that input will be used as relu loss input
     layer_output = ['conv1'] # List of layers that output will be used as custom loss input
-    # Non-fixed loss ratio
-    default_loss_scheduler = lambda t: np.interp([t],\
-            [0, 10, 10, 50],\
-            [0.8, 0.9, 0.99, 0.99])[0]
     ###############################################################################
 
 
     # Load the existing checkpoint
-    checkpoint = torch.load('./experiments/cifar10_res34_margin_100_testrun2/checkpoints/checkpoint_query_best.pt') # C:/Users/Someone/margin-based-watermarking/experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt
+    checkpoint = torch.load('./experiments/cifar10_res18_margin_100_/checkpoints/checkpoint_query_best.pt') # C:/Users/Someone/margin-based-watermarking/experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt
     # Preparation for loading
     CIFAR_QUERY_SIZE = (3, 32, 32) # input size
     response_scale = 10 # number of classes
@@ -317,8 +317,10 @@ if __name__ == "__main__":
     
     train_model.to(device)
     
+    print(f"Nat acc:{checkpoint['val_nat_acc']}, Query acc:{checkpoint['val_query_acc']}")
+    
     # Start training
-    activated_neuron_similarity(dataset, subset_rate, train_model, device, query, response, query_indices, layer_input)
+    activated_neuron_similarity(dataset, subset_rate, train_model, device, query, query_indices, layer_input)
     
     breakpoint()
     
