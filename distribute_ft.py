@@ -7,7 +7,7 @@ import numpy as np
 from models import mnist, cifar10, resnet, queries
 #from torchsummary import summary
 from loaders import get_cifar10_loaders, get_cifar100_loaders, get_svhn_loaders, get_mnist_loaders,get_cifar10_loaders_sub
-
+from similarity_check import activated_neuron_similarity
 
 # Custom Loss function that take into two models water_model and train_model, and return the mean squared error between output of certain layers
 def relu_neu_loss(water_relu, train_relu):
@@ -66,7 +66,7 @@ def custom_loss1(water_model, train_model, trigger=1e-3):
 
 
 # Define the training loop
-def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimizer, device, query, response,num_epochs=10, new_loss_r=0, default_loss_r=1, excluded_index=None, layer_output=None, layer_input=None):
+def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimizer, device, query, response, original_response, num_epochs=10, new_loss_r=0, default_loss_r=1, excluded_index=None, layer_output=None, layer_input=None):
     
     for epoch in range(num_epochs):
         
@@ -197,16 +197,11 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
                 print(f"{len(w_hooks1)} and {len(t_hooks1)} layers of input are being recorded on water/train model.")
                      
         if epoch == 0 :    
-            """ #Testing train model
-            print("Train Model Main Task acc before training...")
-            train_test_acc.append(model_on_testset(train_model, test_loader, device))
-            # Query train models
-            print("Train Model Query acc before training...")
-            train_query_acc.append(round(model_on_queryset(train_model, query, response, device).item(),4)) """
             print("Train model main/query acc eval...")
             main_acc = model_on_testset(train_model, test_loader, device)
             query_acc = round(model_on_queryset(train_model, query, response, device).item(),2)
-            train_test_acc.append(f"{main_acc}/{query_acc}")
+            recover_acc = round(model_on_queryset(train_model, query, original_response, device).item(),2)
+            train_test_acc.append(f"{main_acc}/{query_acc}/{recover_acc}")
         
             
         print(f"===============================Now in epoch {epoch+1}...===============================")
@@ -266,7 +261,7 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             """ if batch_idx % 5 == 0:
                 print(f"{batch_idx+1} batch relu neuron loss: {relu_new_loss.item()}")   """
             
-            kd_loss = loss_fn_kd(outputs, labels, outputs_water, 1, 20)
+            kd_loss = loss_fn_kd(outputs, labels, outputs_water, 0.9, 20)
             #kd_loss = F.cross_entropy(outputs, labels)
              
             """ if batch_idx % 5 == 0:
@@ -340,7 +335,8 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             print("Train model main/query acc eval...")
             main_acc = model_on_testset(train_model, test_loader, device)
             query_acc = round(model_on_queryset(train_model, query, response, device).item(),2)
-            train_test_acc.append(f"{main_acc}/{query_acc}")
+            recover_acc = round(model_on_queryset(train_model, query, original_response, device).item(),2)
+            train_test_acc.append(f"{main_acc}/{query_acc}/{recover_acc}")
         
         if epoch == 0 or epoch == num_epochs-1:    
             """ print("Water Model Test Process...")
@@ -413,8 +409,8 @@ if __name__ == "__main__":
     ########################### Hyperparameters setting ###########################
     dataset = 'cifar10'
     subset_rate = 0.1 # 0~1
-    epoch = 3
-    default_loss_ratio = 200 # >=0
+    epoch = 50
+    default_loss_ratio = 1 # >=0
     new_loss_ratio = 0# >=0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Device: ", device)
@@ -422,8 +418,8 @@ if __name__ == "__main__":
     layer_output = ['conv1'] # List of layers that output will be used as custom loss input
     # Non-fixed loss ratio
     default_loss_scheduler = lambda t: np.interp([t],\
-            [0, 10, 10, 50],\
-            [0.8, 0.9, 0.99, 0.99])[0]
+            [0, 3, 3, 50],\
+            [0.5, 0.5, 1, 1])[0]
     ###############################################################################
 
 
@@ -463,7 +459,7 @@ if __name__ == "__main__":
     
     
     # Start training
-    train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train_kd_loss1(dataset, subset_rate, train_model, water_model, opt, device, query, response, epoch, new_loss_ratio, default_loss_scheduler, query_indices, layer_input, layer_output)
+    train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train_kd_loss1(dataset, subset_rate, train_model, water_model, opt, device, query, response, original_response, epoch, new_loss_ratio, default_loss_scheduler, query_indices, layer_output, layer_input)
     
     # Print the results
     print(f"===============================Training on {subset_rate} of {dataset} with old/new loss ratio {default_loss_ratio}/{new_loss_ratio} for {epoch} epochs.===============================")
@@ -471,6 +467,10 @@ if __name__ == "__main__":
     #print("Train model Query Acc:", train_query_acc)
     print(f"Water model Test/Query Acc:{water_test_acc}")
     
+    print("Neuron Similarity of Watered model:")
+    activated_neuron_similarity(dataset, subset_rate, water_model, device, query, query_indices, ['conv1','conv2'])
+    print("Neuron Similarity of Trained model:")
+    activated_neuron_similarity(dataset, subset_rate, train_model, device, query, query_indices, ['conv1','conv2'])
     
     breakpoint()
     
