@@ -201,7 +201,7 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             main_acc = model_on_testset(train_model, test_loader, device)
             query_acc = round(model_on_queryset(train_model, query, response, device).item(),2)
             recover_acc = round(model_on_queryset(train_model, query, original_response, device).item(),2)
-            train_test_acc.append(f"{main_acc}/{query_acc}/{recover_acc}")
+            train_test_acc.append([epoch,main_acc,query_acc,recover_acc])
         
             
         print(f"===============================Now in epoch {epoch+1}...===============================")
@@ -325,7 +325,7 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             val_accuracy = correct / total
             print(f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {val_epoch_loss:.4f}, Validation Accuracy: {val_accuracy:.4f}")
         
-        if epoch % 2 == 0:   
+        if epoch % 2 == 1:   
             #Testing train model
             """ print("Train Model Test Process...")
             train_test_acc.append(model_on_testset(train_model, test_loader, device))
@@ -336,7 +336,7 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             main_acc = model_on_testset(train_model, test_loader, device)
             query_acc = round(model_on_queryset(train_model, query, response, device).item(),2)
             recover_acc = round(model_on_queryset(train_model, query, original_response, device).item(),2)
-            train_test_acc.append(f"{main_acc}/{query_acc}/{recover_acc}")
+            train_test_acc.append([epoch+1,main_acc,query_acc,recover_acc])
         
         if epoch == 0 or epoch == num_epochs-1:    
             """ print("Water Model Test Process...")
