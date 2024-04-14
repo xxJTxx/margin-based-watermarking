@@ -67,7 +67,8 @@ def get_cifar10_loaders_sub(subset_rate=1, exclude_indices=None, root='../data',
     for data, target in train_set:
         class_label = target
         num_samples_per_class[class_label] += 1
-    print(f"# of smaples in every class in training set:{num_samples_per_class}")
+    if subset_rate != 1:
+        print(f"# of smaples in every class in training set:{num_samples_per_class}")
     
     train_loader = DataLoader(train_set, batch_size=128, shuffle=True, num_workers=2, drop_last=True)
     val_loader = DataLoader(val_set, batch_size=128, shuffle=False, num_workers=2, drop_last=False)

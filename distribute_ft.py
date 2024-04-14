@@ -37,7 +37,7 @@ def loss_fn_kd(outputs, labels, teacher_outputs, alpha, temperature):
     return KD_loss
 
 # Custom Loss function
-def custom_loss1(water_model, train_model, trigger=1e-3):
+def custom_loss1(water_model, train_model, trigger=1e-2):
         # Denominator take abs value to maintain the sign
         w_denominator=torch.abs(water_model.detach())
         t_denominator=torch.abs(train_model.detach()) 
@@ -261,7 +261,7 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             """ if batch_idx % 5 == 0:
                 print(f"{batch_idx+1} batch relu neuron loss: {relu_new_loss.item()}")   """
             
-            kd_loss = loss_fn_kd(outputs, labels, outputs_water, 0.9, 20)
+            kd_loss = loss_fn_kd(outputs, labels, outputs_water, 1, 20)
             #kd_loss = F.cross_entropy(outputs, labels)
              
             """ if batch_idx % 5 == 0:
@@ -275,7 +275,9 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
                     print(f"{batch_idx+1} batch {default_loss_r}:{new_loss_r} combined loss: {loss.item()}") """
             # if default_loss_r is passed in with non_fixed ratio (new_loss_r will be replaced with the number calculated below and ignore what was passing into this function)
             else:
-                loss = 10*(10*(default_loss_r(epoch))*kd_loss + (1-default_loss_r(epoch))*(new_loss))
+                #loss_mul = 100/(epoch+1)+4 if epoch > 20 else 10
+                loss_mul = 10
+                loss = loss_mul*(10*(default_loss_r(epoch))*kd_loss + (1-default_loss_r(epoch))*(new_loss))
                 """ if batch_idx % 5 == 0:
                     print(f"{batch_idx+1} batch non_fixed {default_loss_r(epoch)}:{1-default_loss_r(epoch)} combined loss: {loss.item()}") """
             
@@ -409,22 +411,31 @@ if __name__ == "__main__":
     ########################### Hyperparameters setting ###########################
     dataset = 'cifar10'
     subset_rate = 0.1 # 0~1
-    epoch = 50
-    default_loss_ratio = 1 # >=0
+    epoch = 100
+    main_loss_ratio = 1 # >=0
     new_loss_ratio = 0# >=0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Device: ", device)
     layer_input = ['conv2'] # List of layers that input will be used as relu loss input
     layer_output = ['conv1'] # List of layers that output will be used as custom loss input
     # Non-fixed loss ratio
-    default_loss_scheduler = lambda t: np.interp([t],\
-            [0, 3, 3, 50],\
-            [0.5, 0.5, 1, 1])[0]
+    main_loss_scheduler = lambda t: np.interp([t],\
+            [0  ,   5,     5,    8, 8, 40],\
+            [0.8, 0.92, 0.94, 0.98, 1,  1])[0]
+    ratio_type = 'fix' #'fix' or 'scheduler'
+    using_checkpoint = 1 #0:false, 1:true
     ###############################################################################
 
-
+    if ratio_type == 'fix':
+        the_main_task_r = main_loss_ratio
+    elif ratio_type == 'scheduler':
+        the_main_task_r = main_loss_scheduler
+    else:
+        print("Choose the predifined type of ratio.")
+        breakpoint()
+    
     # Load the existing checkpoint
-    checkpoint = torch.load('./experiments/cifar10_res18_margin_100_/checkpoints/checkpoint_query_best.pt') # C:/Users/Someone/margin-based-watermarking/experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt
+    checkpoint = torch.load('./experiments/cifar10_res18_base_100_TMH/checkpoints/checkpoint_query_best.pt') # C:/Users/Someone/margin-based-watermarking/experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt
     # Preparation for loading
     CIFAR_QUERY_SIZE = (3, 32, 32) # input size
     response_scale = 10 # number of classes
@@ -434,10 +445,15 @@ if __name__ == "__main__":
     # Load the model  structure from checkpoint
     train_model = model_archive[checkpoint['model']['type']](num_classes=response_scale)
     # Load the model weights
-    train_model.load_state_dict(checkpoint['model']['state_dict'])
+    if using_checkpoint:
+        print("Start with checkpoint")
+        train_model.load_state_dict(checkpoint['model']['state_dict'])
+    else:
+        print("Start with initialed weight")
     # Load the optimizer from checkpoint
-    opt = torch.optim.SGD(train_model.parameters(), lr=0.001)
-    opt.load_state_dict(checkpoint['optimizer'])
+    """ opt = torch.optim.SGD(train_model.parameters(), lr=0.1)
+    opt.load_state_dict(checkpoint['optimizer']) """
+    opt = torch.optim.Adam(train_model.parameters())
     # Load the query from checkpoint and the index of them
     query = checkpoint['query_model']['state_dict']['query']
     query.to("cpu")
@@ -459,10 +475,13 @@ if __name__ == "__main__":
     
     
     # Start training
-    train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train_kd_loss1(dataset, subset_rate, train_model, water_model, opt, device, query, response, original_response, epoch, new_loss_ratio, default_loss_scheduler, query_indices, layer_output, layer_input)
+    train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train_kd_loss1(dataset, subset_rate, train_model, water_model, opt, device, query, response, original_response, epoch, new_loss_ratio, the_main_task_r, query_indices, layer_output, layer_input)
     
     # Print the results
-    print(f"===============================Training on {subset_rate} of {dataset} with old/new loss ratio {default_loss_ratio}/{new_loss_ratio} for {epoch} epochs.===============================")
+    if ratio_type == "fix":    
+        print(f"===============================Training on {subset_rate} of {dataset} with old/new loss ratio {main_loss_ratio}/{new_loss_ratio} for {epoch} epochs.===============================")
+    elif ratio_type == "scheduler":
+        print(f"===============================Training on {subset_rate} of {dataset} with non-fixed ratio for {epoch} epochs.===============================")
     print("Train model Test Acc:", train_test_acc)
     #print("Train model Query Acc:", train_query_acc)
     print(f"Water model Test/Query Acc:{water_test_acc}")
@@ -472,5 +491,5 @@ if __name__ == "__main__":
     print("Neuron Similarity of Trained model:")
     activated_neuron_similarity(dataset, subset_rate, train_model, device, query, query_indices, ['conv1','conv2'])
     
-    breakpoint()
+    #breakpoint()
     

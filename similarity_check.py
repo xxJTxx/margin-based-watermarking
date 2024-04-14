@@ -49,7 +49,7 @@ def activated_neuron_similarity(dataset, subset_rate, water_model, device, query
             
     # Generate subset data loader based on dataset
     if dataset == 'cifar10':
-        train_loader, val_loader, test_loader = get_cifar10_loaders_sub(subset_rate, excluded_index)
+        train_loader, val_loader, test_loader = get_cifar10_loaders_sub()
     elif dataset == 'cifar100':
         train_loader, val_loader, test_loader = get_cifar100_loaders()
     elif dataset == 'svhn':
@@ -222,19 +222,15 @@ def activated_neuron_similarity(dataset, subset_rate, water_model, device, query
                 trigger_activate_neuron_4[idx] += relu_neu_count(water_relu4[idx][0][sample_idx],len(query))        
     
     #print(f"Debugger trigger: {debugger}")
-
-    print(f"Layer1 similarity: {relu_neu_similarity(clean_activate_neuron_1, trigger_activate_neuron_1)}")
-    print(f"Layer2 similarity: {relu_neu_similarity(clean_activate_neuron_2, trigger_activate_neuron_2)}")
-    print(f"Layer3 similarity: {relu_neu_similarity(clean_activate_neuron_3, trigger_activate_neuron_3)}")
-    print(f"Layer4 similarity: {relu_neu_similarity(clean_activate_neuron_4, trigger_activate_neuron_4)}")
-    
     clean_activate_total = clean_activate_neuron_1 + clean_activate_neuron_2 + clean_activate_neuron_3 + clean_activate_neuron_4
     trigger_activate_total = trigger_activate_neuron_1 + trigger_activate_neuron_2 + trigger_activate_neuron_3 + trigger_activate_neuron_4
-    print(f"Total layer similarity: {relu_neu_similarity(clean_activate_total, trigger_activate_total)}")
-        
-        
+    l1s=torch.round((relu_neu_similarity(clean_activate_neuron_1, trigger_activate_neuron_1)*10000))/10000
+    l2s=torch.round((relu_neu_similarity(clean_activate_neuron_2, trigger_activate_neuron_2)*10000))/10000
+    l3s=torch.round((relu_neu_similarity(clean_activate_neuron_3, trigger_activate_neuron_3)*10000))/10000
+    l4s=torch.round((relu_neu_similarity(clean_activate_neuron_4, trigger_activate_neuron_4)*10000))/10000
+    ts=torch.round((relu_neu_similarity(clean_activate_total, trigger_activate_total)*10000))/10000
+    print(f"L1 similarity: {l1s}/ L2 similarity: {l2s}/ L3 similarity: {l3s}/ L4 similarity: {l4s}/ Total similarity: {ts}")      
     
-        
     # Remove hooks for model after used and reset the handle lists
     for handle in w_hooks1:
         handle.remove()
