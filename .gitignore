@@ -3,3 +3,4 @@
 *swp*
 *.ipynb_checkpoints*
 experiments/
+distribute_ft copy.py
