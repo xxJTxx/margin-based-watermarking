@@ -54,7 +54,7 @@ def loop(model, query_model, loader, opt, lr_scheduler, epoch, logger, output_di
             loss = nat_loss.mean()
             
         elif train_type == 'base':
-            query, response = query_model()
+            query, response = query_model(num_sample=25) # query, response = query_model()
             query_preds = model(query)
             query_acc = (query_preds.topk(1, dim=1).indices == response.unsqueeze(1)).all(1).float().mean()
             query_loss = F.cross_entropy(query_preds, response, reduction='none')

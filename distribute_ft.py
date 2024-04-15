@@ -66,7 +66,7 @@ def custom_loss1(water_model, train_model, trigger=1e-2):
 
 
 # Define the training loop
-def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimizer, device, query, response, original_response, num_epochs=10, new_loss_r=0, default_loss_r=1, excluded_index=None, layer_output=None, layer_input=None):
+def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimizer, device, query, response, original_response, num_epochs=10, new_loss_r=0, default_loss_r=1, main_loss='CE', excluded_index=None, layer_output=None, layer_input=None):
     
     for epoch in range(num_epochs):
         
@@ -261,8 +261,10 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             """ if batch_idx % 5 == 0:
                 print(f"{batch_idx+1} batch relu neuron loss: {relu_new_loss.item()}")   """
             
-            kd_loss = loss_fn_kd(outputs, labels, outputs_water, 1, 20)
-            #kd_loss = F.cross_entropy(outputs, labels)
+            if main_loss == 'KD':
+                kd_loss = loss_fn_kd(outputs, labels, outputs_water, 1, 20)
+            else:    
+                kd_loss = F.cross_entropy(outputs, labels)
              
             """ if batch_idx % 5 == 0:
                 print(f"{batch_idx+1} batch kd loss: {kd_loss.item()}") """      
@@ -411,7 +413,7 @@ if __name__ == "__main__":
     ########################### Hyperparameters setting ###########################
     dataset = 'cifar10'
     subset_rate = 0.1 # 0~1
-    epoch = 100
+    epoch = 50
     main_loss_ratio = 1 # >=0
     new_loss_ratio = 0# >=0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -423,6 +425,7 @@ if __name__ == "__main__":
             [0  ,   5,     5,    8, 8, 40],\
             [0.8, 0.92, 0.94, 0.98, 1,  1])[0]
     ratio_type = 'fix' #'fix' or 'scheduler'
+    main_loss_type = 'CE' # 'CE' or 'KD'
     using_checkpoint = 1 #0:false, 1:true
     ###############################################################################
 
@@ -435,7 +438,7 @@ if __name__ == "__main__":
         breakpoint()
     
     # Load the existing checkpoint
-    checkpoint = torch.load('./experiments/cifar10_res18_base_100_TMH/checkpoints/checkpoint_query_best.pt') # C:/Users/Someone/margin-based-watermarking/experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt
+    checkpoint = torch.load('./experiments/cifar10_res34_margin_100_queryindices/checkpoints/checkpoint_query_best.pt') # C:/Users/Someone/margin-based-watermarking/experiments/cifar10_res34_margin_100_/checkpoints/checkpoint_query_best.pt
     # Preparation for loading
     CIFAR_QUERY_SIZE = (3, 32, 32) # input size
     response_scale = 10 # number of classes
@@ -451,8 +454,8 @@ if __name__ == "__main__":
     else:
         print("Start with initialed weight")
     # Load the optimizer from checkpoint
-    """ opt = torch.optim.SGD(train_model.parameters(), lr=0.1)
-    opt.load_state_dict(checkpoint['optimizer']) """
+    """ opt = torch.optim.SGD(train_model.parameters(), lr=0.1) """
+    """ opt.load_state_dict(checkpoint['optimizer']) """
     opt = torch.optim.Adam(train_model.parameters())
     # Load the query from checkpoint and the index of them
     query = checkpoint['query_model']['state_dict']['query']
@@ -475,13 +478,13 @@ if __name__ == "__main__":
     
     
     # Start training
-    train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train_kd_loss1(dataset, subset_rate, train_model, water_model, opt, device, query, response, original_response, epoch, new_loss_ratio, the_main_task_r, query_indices, layer_output, layer_input)
+    train_test_acc, train_query_acc, water_test_acc, water_query_acc = start_train_kd_loss1(dataset, subset_rate, train_model, water_model, opt, device, query, response, original_response, epoch, new_loss_ratio, the_main_task_r, main_loss_type ,query_indices, layer_output, layer_input)
     
     # Print the results
     if ratio_type == "fix":    
-        print(f"===============================Training on {subset_rate} of {dataset} with old/new loss ratio {main_loss_ratio}/{new_loss_ratio} for {epoch} epochs.===============================")
+        print(f"===============================Training on {subset_rate} of {dataset} with {main_loss_type}/new loss ratio {main_loss_ratio}/{new_loss_ratio} for {epoch} epochs.===============================")
     elif ratio_type == "scheduler":
-        print(f"===============================Training on {subset_rate} of {dataset} with non-fixed ratio for {epoch} epochs.===============================")
+        print(f"===============================Training on {subset_rate} of {dataset} with non-fixed ratio on {main_loss_type} for {epoch} epochs.===============================")
     print("Train model Test Acc:", train_test_acc)
     #print("Train model Query Acc:", train_query_acc)
     print(f"Water model Test/Query Acc:{water_test_acc}")
