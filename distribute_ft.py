@@ -425,10 +425,12 @@ if __name__ == "__main__":
             [0  ,   5,     5,    8, 8, 40],\
             [0.8, 0.92, 0.94, 0.98, 1,  1])[0]
     ratio_type = 'fix' #'fix' or 'scheduler'
-    main_loss_type = 'CE' # 'CE' or 'KD'
+    main_loss_type = 'KD' # 'CE' or 'KD'
+    opt_type = 'Adam' # 'Adam' or 'SGD'
     using_checkpoint = 1 #0:false, 1:true
     ###############################################################################
 
+    # Set loss ratio type
     if ratio_type == 'fix':
         the_main_task_r = main_loss_ratio
     elif ratio_type == 'scheduler':
@@ -447,28 +449,38 @@ if __name__ == "__main__":
 
     # Load the model  structure from checkpoint
     train_model = model_archive[checkpoint['model']['type']](num_classes=response_scale)
+    
     # Load the model weights
     if using_checkpoint:
         print("Start with checkpoint")
         train_model.load_state_dict(checkpoint['model']['state_dict'])
     else:
         print("Start with initialed weight")
+    
     # Load the optimizer from checkpoint
-    """ opt = torch.optim.SGD(train_model.parameters(), lr=0.1) """
-    """ opt.load_state_dict(checkpoint['optimizer']) """
-    opt = torch.optim.Adam(train_model.parameters())
+    if opt_type == 'SGD':
+        opt = torch.optim.SGD(train_model.parameters(), lr=0.1)
+        """ opt.load_state_dict(checkpoint['optimizer']) """
+    elif opt_type == 'Adam':
+        opt = torch.optim.Adam(train_model.parameters())
+    else:
+        print("Choose the predifined type of optimizer.")
+        breakpoint()
+   
     # Load the query from checkpoint and the index of them
     query = checkpoint['query_model']['state_dict']['query']
     query.to("cpu")
     query_indices = checkpoint['query_model']['index']
+    
     # Load the response from checkpoint
     response = checkpoint['query_model']['state_dict']['response']
+    
     # Load the original response from checkpoint
     original_response = checkpoint['query_model']['state_dict']['original_response']
 
-    # Create a same model for training with deep copy
-    #water_model = copy.deepcopy(train_model)
+    # Create a same model as teacher
     water_model = model_archive[checkpoint['model']['type']](num_classes=response_scale)
+    
     # Load the model weights
     water_model.load_state_dict(checkpoint['model']['state_dict'])
     
@@ -482,9 +494,9 @@ if __name__ == "__main__":
     
     # Print the results
     if ratio_type == "fix":    
-        print(f"===============================Training on {subset_rate} of {dataset} with {main_loss_type}/new loss ratio {main_loss_ratio}/{new_loss_ratio} for {epoch} epochs.===============================")
+        print(f"===============================Training on {subset_rate} of {dataset} with {main_loss_type}/new loss ratio {main_loss_ratio}/{new_loss_ratio} and opt {opt_type} for {epoch} epochs.===============================")
     elif ratio_type == "scheduler":
-        print(f"===============================Training on {subset_rate} of {dataset} with non-fixed ratio on {main_loss_type} for {epoch} epochs.===============================")
+        print(f"===============================Training on {subset_rate} of {dataset} with non-fixed ratio on {main_loss_type} and opt {opt_type} for {epoch} epochs.===============================")
     print("Train model Test Acc:", train_test_acc)
     #print("Train model Query Acc:", train_query_acc)
     print(f"Water model Test/Query Acc:{water_test_acc}")
