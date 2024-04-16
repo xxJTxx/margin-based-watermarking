@@ -263,8 +263,12 @@ def start_train_kd_loss1(dataset, subset_rate, train_model, water_model, optimiz
             
             if main_loss == 'KD':
                 kd_loss = loss_fn_kd(outputs, labels, outputs_water, 1, 20)
-            else:    
+            elif main_loss == 'KDhard':    
+                outputs_water_hard = outputs_water.topk(1, dim=1).indices.squeeze()
+                kd_loss = F.cross_entropy(outputs, outputs_water_hard)
+            else:
                 kd_loss = F.cross_entropy(outputs, labels)
+            
              
             """ if batch_idx % 5 == 0:
                 print(f"{batch_idx+1} batch kd loss: {kd_loss.item()}") """      
@@ -413,7 +417,7 @@ if __name__ == "__main__":
     ########################### Hyperparameters setting ###########################
     dataset = 'cifar10'
     subset_rate = 0.1 # 0~1
-    epoch = 50
+    epoch = 100
     main_loss_ratio = 1 # >=0
     new_loss_ratio = 0# >=0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -425,9 +429,9 @@ if __name__ == "__main__":
             [0  ,   5,     5,    8, 8, 40],\
             [0.8, 0.92, 0.94, 0.98, 1,  1])[0]
     ratio_type = 'fix' #'fix' or 'scheduler'
-    main_loss_type = 'KD' # 'CE' or 'KD'
-    opt_type = 'Adam' # 'Adam' or 'SGD'
-    using_checkpoint = 1 #0:false, 1:true
+    main_loss_type = 'KDhard' # 'CE', 'KD', 'KDhard'
+    opt_type = 'SGD' # 'Adam' or 'SGD'
+    using_checkpoint = 0 #0:false, 1:true
     ###############################################################################
 
     # Set loss ratio type
@@ -469,7 +473,7 @@ if __name__ == "__main__":
    
     # Load the query from checkpoint and the index of them
     query = checkpoint['query_model']['state_dict']['query']
-    query.to("cpu")
+    query.to(device)
     query_indices = checkpoint['query_model']['index']
     
     # Load the response from checkpoint
