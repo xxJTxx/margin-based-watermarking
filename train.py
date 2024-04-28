@@ -19,7 +19,7 @@ from utils import MultiAverageMeter
 CIFAR_QUERY_SIZE = (3, 32, 32)
 
 
-def loop(model, query_model, loader, opt, lr_scheduler, epoch, logger, output_dir, max_epoch=100, train_type='standard', mode='train', device='cuda', addvar=None):
+def loop(model, query_model, loader, opt, lr_scheduler, epoch, logger, output_dir, num_query=100, max_epoch=100, train_type='standard', mode='train', device='cuda', addvar=None):
     meters = MultiAverageMeter(['nat loss', 'nat acc', 'query loss', 'query acc'])
 
     for batch_idx, batch in enumerate(loader):
@@ -64,7 +64,12 @@ def loop(model, query_model, loader, opt, lr_scheduler, epoch, logger, output_di
             num_sample_fn = lambda x: np.interp([x], [0, max_epoch], [25, 25])[0] # 線性插值出來不是都25?
             num_sample = int(num_sample_fn(epoch))
             if mode == 'train':
-                query, response = query_model(discretize=False, num_sample=num_sample)
+                
+                num_sample = int(len(batch[0]) * 0.2)
+                num_query_batch = num_query / num_sample
+                query, response = query_model(batch=int(batch_idx % num_query_batch), discretize=False, num_sample=num_sample)
+                
+                #query, response = query_model(discretize=False, num_sample=num_sample)
                 for _ in range(5): # 看起來PGA的次數是寫死的?
                     query = query.detach()
                     query.requires_grad_(True)
@@ -183,7 +188,7 @@ def train(args, output_dir):
     for epoch in range(args.epoch):
         model.train()
         query.train()
-        train_meters = loop(model, query, train_loader, opt, lr_scheduler, epoch, logger, output_dir,
+        train_meters = loop(model, query, train_loader, opt, lr_scheduler, epoch, logger, output_dir, num_query=args.num_query,
                         train_type=args.train_type, max_epoch=args.epoch, mode='train', device=args.device, addvar=args.variable)
 
         with torch.no_grad():

@@ -88,13 +88,14 @@ class StochasticImageQuery(ImageQuery):
     def __init__(self, query_size, response_size, query_scale, response_scale, reset=False):
         super().__init__(query_size, response_size, query_scale, response_scale, reset)
         
-    def forward(self, discretize=True, num_sample=1):
+    def forward(self, batch=-1,discretize=True, num_sample=1):
         if self.training: # in training mode: randomly return a sample in trigger set and its target class
-            rand_idx = torch.randint(0, self.query.size(0), (num_sample,))
+            #rand_idx = torch.randint(0, self.query.size(0), (num_sample,))
+            idx = torch.arange(batch*num_sample, (batch+1)*num_sample, 1)
             if discretize:
-                return self.discretize(self.project(self.query[rand_idx])), self.response[rand_idx]
+                return self.discretize(self.project(self.query[idx])), self.response[idx]
             else:
-                return self.project(self.query[rand_idx]), self.response[rand_idx]
+                return self.project(self.query[idx]), self.response[idx]
         else: # in evaluation mode: return the whole trigger set with their target classes
             if discretize:
                 return self.discretize(self.project(self.query)), self.response
